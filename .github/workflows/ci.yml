@@ -33,8 +33,7 @@ jobs:
           --configuration Release
           --runtime win-x64
           --self-contained false
-          --no-build
-          -p:Version=0.1.0
+          -p:Version=0.1.0-ci.${{ github.run_number }}
           -o artifacts/publish/win-x64
 
       - name: Archive published output

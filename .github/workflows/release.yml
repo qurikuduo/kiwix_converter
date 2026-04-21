@@ -64,7 +64,6 @@ jobs:
           --configuration Release
           --runtime win-x64
           --self-contained false
-          --no-build
           -p:Version=${{ steps.version.outputs.clean }}
           -o artifacts/publish/win-x64
 
