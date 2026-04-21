@@ -1,0 +1,45 @@
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+    authors:
+      - github-actions
+  categories:
+    - title: Breaking Changes
+      labels:
+        - breaking-change
+    - title: New Features
+      labels:
+        - enhancement
+        - feature
+    - title: Fixes
+      labels:
+        - bug
+        - fix
+    - title: Documentation
+      labels:
+        - documentation
+        - docs
+    - title: Maintenance
+      labels:
+        - chore
+        - dependencies
+    - title: Other Changes
+      labels:
+        - '*'
+
+change-template: '- $TITLE (#$NUMBER) by @$AUTHOR'
+
+template: |
+  ## Summary
+
+  $CHANGES
+
+  ## Artifacts
+
+  - Windows package: attached `.zip`
+  - Integrity check: attached `.sha256`
+
+  ## Contributors
+
+  $CONTRIBUTORS

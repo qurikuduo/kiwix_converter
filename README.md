@@ -2,6 +2,14 @@
 
 Kiwix Converter is a WinForms + SQLite desktop application for exporting kiwix-desktop downloaded ZIM archives into article-level Markdown and RAG-ready JSON artifacts.
 
+## Language Editions
+
+- English: [README.md](README.md)
+- 简体中文: [README.zh-CN.md](README.zh-CN.md)
+- 日本語: [README.ja.md](README.ja.md)
+- Español: [README.es.md](README.es.md)
+- العربية: [README.ar.md](README.ar.md)
+
 ## What It Does
 
 - Scans a configured kiwix-desktop download directory and syncs available ZIM files into the application database.
@@ -36,6 +44,12 @@ docs/
 - `.github/workflows/ci.yml` builds the solution on pushes and pull requests to `main`, then uploads a packaged Windows artifact.
 - `.github/workflows/release.yml` publishes a packaged release whenever a semantic version tag such as `v0.1.0` is pushed.
 - Release assets are named with the conventional `vX.Y.Z` tag format and include a SHA-256 checksum file.
+- `.github/release.yml` defines the automatic release note structure so generated notes read like a conventional release summary instead of a raw commit list.
+
+## Wiki Sources
+
+- Multilingual wiki source pages are stored under `docs/wiki/` and can be published to the GitHub wiki.
+- The current wiki set includes multilingual home pages and release process pages in English, Chinese, Japanese, Spanish, and Arabic.
 
 ## Package Dependencies
 
