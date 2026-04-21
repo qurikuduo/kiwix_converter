@@ -519,7 +519,7 @@ public sealed class ConversionCoordinator
                 language = archiveMetadata.Language,
                 publisher = archiveMetadata.Publisher,
                 archiveDate = archiveMetadata.ArchiveDate,
-                chunk.chunkId,
+                chunk.ChunkId,
                 chunk.Index,
                 chunk.Heading,
                 chunk.CharacterCount,

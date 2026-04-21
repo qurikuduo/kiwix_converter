@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS log_entries (
     public async Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        using var transaction = connection.BeginTransaction();
 
         await UpsertSettingAsync(connection, transaction, "kiwixDesktopDirectory", settings.KiwixDesktopDirectory, cancellationToken);
         await UpsertSettingAsync(connection, transaction, "defaultOutputDirectory", settings.DefaultOutputDirectory, cancellationToken);
@@ -160,7 +160,7 @@ CREATE TABLE IF NOT EXISTS log_entries (
         var scannedAt = DateTime.UtcNow;
 
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        using var transaction = connection.BeginTransaction();
 
         await using (var markUnavailable = connection.CreateCommand())
         {
