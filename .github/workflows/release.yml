@@ -78,25 +78,25 @@ jobs:
             $commitLines = '- No source changes were detected between the compared revisions.'
           }
 
-          $notes = @"
-## Summary
-
-- Release version: $currentVersion
-$previousLine
-
-## Included Changes
-
-$commitLines
-
-## Artifacts
-
-- Windows package: attached `.zip`
-- Integrity check: attached `.sha256`
-
-## Full Changelog
-
-$changelogLine
-"@
+          $notes = @(
+            '## Summary',
+            '',
+            "- Release version: $currentVersion",
+            $previousLine,
+            '',
+            '## Included Changes',
+            '',
+            $commitLines,
+            '',
+            '## Artifacts',
+            '',
+            '- Windows package: attached `.zip`',
+            '- Integrity check: attached `.sha256`',
+            '',
+            '## Full Changelog',
+            '',
+            $changelogLine
+          ) -join "`n"
 
           $notesPath = 'artifacts/package/release-notes.md'
           Set-Content -Path $notesPath -Value $notes -Encoding utf8
