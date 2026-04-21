@@ -1,0 +1,99 @@
+name: release
+
+on:
+  push:
+    tags:
+      - v*.*.*
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release tag in semantic version format, for example v0.1.0
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            $version = '${{ inputs.version }}'
+          }
+          else {
+            $version = '${{ github.ref_name }}'
+          }
+
+          if (-not $version.StartsWith('v')) {
+            throw 'Release version must start with v.'
+          }
+
+          if ($version -notmatch '^v\d+\.\d+\.\d+(-[0-9A-Za-z\.-]+)?$') {
+            throw 'Release version must follow semantic versioning, for example v1.2.3 or v1.2.3-rc.1.'
+          }
+
+          $clean = $version.Substring(1)
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "clean=$clean" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Restore dependencies
+        run: dotnet restore KiwixConverter.sln
+
+      - name: Build solution
+        run: dotnet build KiwixConverter.sln --configuration Release --no-restore /p:Version=${{ steps.version.outputs.clean }}
+
+      - name: Publish Windows package
+        run: >-
+          dotnet publish src/KiwixConverter.WinForms/KiwixConverter.WinForms.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained false
+          --no-build
+          -p:Version=${{ steps.version.outputs.clean }}
+          -o artifacts/publish/win-x64
+
+      - name: Package release artifact
+        id: package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/package | Out-Null
+          $zipPath = "artifacts/package/KiwixConverter-win-x64-${{ steps.version.outputs.version }}.zip"
+          Compress-Archive -Path artifacts/publish/win-x64/* -DestinationPath $zipPath -Force
+          $hash = (Get-FileHash -Algorithm SHA256 -Path $zipPath).Hash.ToLowerInvariant()
+          "$hash  $(Split-Path -Leaf $zipPath)" | Out-File -FilePath "$zipPath.sha256" -Encoding utf8
+          "zip_path=$zipPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Upload packaged artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiwix-converter-win-x64-${{ steps.version.outputs.version }}
+          path: |
+            ${{ steps.package.outputs.zip_path }}
+            ${{ steps.package.outputs.zip_path }}.sha256
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Kiwix Converter ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: |
+            ${{ steps.package.outputs.zip_path }}
+            ${{ steps.package.outputs.zip_path }}.sha256

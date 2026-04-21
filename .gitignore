@@ -1,0 +1,11 @@
+.vs/
+artifacts/
+bin/
+obj/
+
+*.cache
+*.db
+*.pdb
+*.suo
+*.user
+*.userosscache

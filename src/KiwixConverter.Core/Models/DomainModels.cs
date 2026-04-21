@@ -1,0 +1,247 @@
+namespace KiwixConverter.Core.Models;
+
+public enum ConversionTaskStatus
+{
+    Pending,
+    Running,
+    Paused,
+    Completed,
+    Faulted
+}
+
+public enum ArticleStatus
+{
+    Pending,
+    InProgress,
+    Completed,
+    Skipped,
+    Failed
+}
+
+public enum LogSeverity
+{
+    Trace,
+    Info,
+    Warning,
+    Error
+}
+
+public sealed class AppSettings
+{
+    public string? KiwixDesktopDirectory { get; set; }
+
+    public string? DefaultOutputDirectory { get; set; }
+
+    public string? ZimdumpExecutablePath { get; set; }
+
+    public int SnapshotIntervalSeconds { get; set; } = 15;
+}
+
+public sealed class ZimLibraryItem
+{
+    public long Id { get; set; }
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public string FullPath { get; set; } = string.Empty;
+
+    public long SizeBytes { get; set; }
+
+    public DateTime LastWriteUtc { get; set; }
+
+    public string? Language { get; set; }
+
+    public string? Publisher { get; set; }
+
+    public string? ArchiveDate { get; set; }
+
+    public DateTime? LastScannedUtc { get; set; }
+
+    public bool IsAvailable { get; set; }
+
+    public bool IsConverted { get; set; }
+
+    public long? LastCompletedTaskId { get; set; }
+}
+
+public sealed class ConversionTaskRecord
+{
+    public long Id { get; set; }
+
+    public long ZimLibraryItemId { get; set; }
+
+    public string ZimPath { get; set; } = string.Empty;
+
+    public string ArchiveKey { get; set; } = string.Empty;
+
+    public string OutputDirectory { get; set; } = string.Empty;
+
+    public ConversionTaskStatus Status { get; set; }
+
+    public DateTime CreatedUtc { get; set; }
+
+    public DateTime? StartedUtc { get; set; }
+
+    public DateTime? CompletedUtc { get; set; }
+
+    public DateTime? LastHeartbeatUtc { get; set; }
+
+    public bool RequestedPause { get; set; }
+
+    public int ProcessedArticles { get; set; }
+
+    public int TotalArticles { get; set; }
+
+    public int SkippedArticles { get; set; }
+
+    public string? CurrentArticleUrl { get; set; }
+
+    public int? CurrentArticleIndex { get; set; }
+
+    public string? ErrorMessage { get; set; }
+}
+
+public sealed class ArticleCheckpointRecord
+{
+    public long Id { get; set; }
+
+    public long TaskId { get; set; }
+
+    public string ArticleUrl { get; set; } = string.Empty;
+
+    public string? ArticleTitle { get; set; }
+
+    public string? OutputRelativePath { get; set; }
+
+    public ArticleStatus Status { get; set; }
+
+    public int AttemptCount { get; set; }
+
+    public int ImageCount { get; set; }
+
+    public int ChunkCount { get; set; }
+
+    public string? ContentHash { get; set; }
+
+    public string? LastError { get; set; }
+
+    public DateTime? LastProcessedUtc { get; set; }
+}
+
+public sealed class LogEntryRecord
+{
+    public long Id { get; set; }
+
+    public long? TaskId { get; set; }
+
+    public DateTime TimestampUtc { get; set; }
+
+    public LogSeverity Level { get; set; }
+
+    public string Category { get; set; } = string.Empty;
+
+    public string Message { get; set; } = string.Empty;
+
+    public string? Details { get; set; }
+
+    public string? ArticleUrl { get; set; }
+
+    public string? Exception { get; set; }
+}
+
+public sealed class ZimArchiveMetadata
+{
+    public string? Title { get; set; }
+
+    public string? Language { get; set; }
+
+    public string? Publisher { get; set; }
+
+    public string? ArchiveDate { get; set; }
+
+    public int ArticleCount { get; set; }
+
+    public Dictionary<string, string> RawMetadata { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
+public sealed class ZimArticleDescriptor
+{
+    public string Url { get; set; } = string.Empty;
+
+    public string Title { get; set; } = string.Empty;
+
+    public string Namespace { get; set; } = "A";
+
+    public int? Index { get; set; }
+}
+
+public sealed class PreparedArticleContent
+{
+    public string Title { get; set; } = string.Empty;
+
+    public string Strategy { get; set; } = string.Empty;
+
+    public string HtmlFragment { get; set; } = string.Empty;
+}
+
+public sealed class ExportedImage
+{
+    public string SourceUrl { get; set; } = string.Empty;
+
+    public string RelativePath { get; set; } = string.Empty;
+
+    public string? AltText { get; set; }
+}
+
+public sealed class RagChunk
+{
+    public string ChunkId { get; set; } = string.Empty;
+
+    public int Index { get; set; }
+
+    public string Text { get; set; } = string.Empty;
+
+    public int CharacterCount { get; set; }
+
+    public string? Heading { get; set; }
+}
+
+public sealed class ArticleExportMetadata
+{
+    public string Title { get; set; } = string.Empty;
+
+    public string ArticleUrl { get; set; } = string.Empty;
+
+    public string? Language { get; set; }
+
+    public string? Publisher { get; set; }
+
+    public string? ArchiveDate { get; set; }
+
+    public string ContentPath { get; set; } = string.Empty;
+
+    public string ChunksPath { get; set; } = string.Empty;
+
+    public List<ExportedImage> Images { get; set; } = [];
+
+    public List<RagChunk> Chunks { get; set; } = [];
+
+    public string ContentHash { get; set; } = string.Empty;
+
+    public DateTime ExportedAtUtc { get; set; }
+
+    public Dictionary<string, string> ArchiveMetadata { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
+public sealed class ArticleProcessingResult
+{
+    public string ArticleTitle { get; set; } = string.Empty;
+
+    public string OutputRelativePath { get; set; } = string.Empty;
+
+    public string ContentHash { get; set; } = string.Empty;
+
+    public int ChunkCount { get; set; }
+
+    public int ImageCount { get; set; }
+}

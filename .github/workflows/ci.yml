@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore KiwixConverter.sln
+
+      - name: Build solution
+        run: dotnet build KiwixConverter.sln --configuration Release --no-restore
+
+      - name: Publish Windows package
+        run: >-
+          dotnet publish src/KiwixConverter.WinForms/KiwixConverter.WinForms.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained false
+          --no-build
+          -p:Version=0.1.0
+          -o artifacts/publish/win-x64
+
+      - name: Archive published output
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/package | Out-Null
+          Compress-Archive -Path artifacts/publish/win-x64/* -DestinationPath artifacts/package/KiwixConverter-win-x64-ci.zip -Force
+
+      - name: Upload CI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiwix-converter-win-x64-ci
+          path: artifacts/package/KiwixConverter-win-x64-ci.zip
+          if-no-files-found: error
