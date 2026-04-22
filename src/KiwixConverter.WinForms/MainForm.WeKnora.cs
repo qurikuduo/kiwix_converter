@@ -8,15 +8,20 @@ public sealed partial class MainForm
     private readonly TextBox _weKnoraAccessTokenTextBox = new() { Dock = DockStyle.Fill, UseSystemPasswordChar = true };
     private readonly TextBox _weKnoraKnowledgeBaseNameTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Existing or new knowledge base name" };
     private readonly TextBox _weKnoraKnowledgeBaseIdTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Optional explicit knowledge base ID" };
-    private readonly TextBox _weKnoraChatModelIdTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Optional KnowledgeQA model ID" };
-    private readonly TextBox _weKnoraEmbeddingModelIdTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Optional Embedding model ID" };
-    private readonly TextBox _weKnoraMultimodalModelIdTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Optional VLLM model ID" };
+    private readonly TextBox _weKnoraKnowledgeBaseDescriptionTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Description used when creating a new knowledge base" };
+    private readonly ComboBox _weKnoraChatModelIdComboBox = CreateWeKnoraModelComboBox();
+    private readonly ComboBox _weKnoraEmbeddingModelIdComboBox = CreateWeKnoraModelComboBox();
+    private readonly ComboBox _weKnoraMultimodalModelIdComboBox = CreateWeKnoraModelComboBox();
     private readonly ComboBox _weKnoraAuthModeComboBox = new() { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly ComboBox _weKnoraKnowledgeBaseComboBox = new() { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly NumericUpDown _weKnoraChunkSizeUpDown = new() { Dock = DockStyle.Fill, Minimum = 100, Maximum = 8192, Increment = 100, Value = 1000 };
+    private readonly NumericUpDown _weKnoraChunkOverlapUpDown = new() { Dock = DockStyle.Fill, Minimum = 0, Maximum = 4096, Increment = 50, Value = 200 };
     private readonly CheckBox _weKnoraAutoCreateKnowledgeBaseCheckBox = new() { Text = "Auto-create the knowledge base when the configured name does not exist", AutoSize = true, Checked = true };
     private readonly CheckBox _weKnoraAppendMetadataCheckBox = new() { Text = "Append export metadata to the synced Markdown content", AutoSize = true, Checked = true };
+    private readonly CheckBox _weKnoraEnableParentChildCheckBox = new() { Text = "Enable parent-child chunking for newly created knowledge bases", AutoSize = true };
     private readonly Button _testWeKnoraConnectionButton = new() { Text = "Test Connection", AutoSize = true };
     private readonly Button _loadWeKnoraKnowledgeBasesButton = new() { Text = "Load Knowledge Bases", AutoSize = true };
+    private readonly Button _loadWeKnoraModelsButton = new() { Text = "Load Models", AutoSize = true };
     private readonly Button _createWeKnoraKnowledgeBaseButton = new() { Text = "Create KB", AutoSize = true };
     private readonly Button _startWeKnoraSyncButton = new() { Text = "Sync Selected Archives", AutoSize = true };
     private readonly Button _pauseWeKnoraSyncButton = new() { Text = "Pause Selected Sync", AutoSize = true };
@@ -34,6 +39,7 @@ public sealed partial class MainForm
     private readonly Label _weKnoraSyncSummaryLabel = new() { Dock = DockStyle.Top, AutoSize = true, Text = "No WeKnora sync task selected." };
 
     private List<WeKnoraKnowledgeBaseInfo> _loadedKnowledgeBases = [];
+    private List<WeKnoraModelInfo> _loadedWeKnoraModels = [];
 
     private void InitializeWeKnoraControls()
     {
@@ -46,6 +52,17 @@ public sealed partial class MainForm
         _weKnoraSyncCandidatesGrid.MultiSelect = true;
         _weKnoraSyncTasksGrid.MultiSelect = false;
         _weKnoraSyncLogsGrid.MultiSelect = false;
+    }
+
+    private static ComboBox CreateWeKnoraModelComboBox()
+    {
+        return new ComboBox
+        {
+            Dock = DockStyle.Fill,
+            DropDownStyle = ComboBoxStyle.DropDown,
+            AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+            AutoCompleteSource = AutoCompleteSource.ListItems
+        };
     }
 
     private Control BuildWeKnoraSettingsGroup()
@@ -62,7 +79,7 @@ public sealed partial class MainForm
         {
             Dock = DockStyle.Top,
             ColumnCount = 3,
-            RowCount = 11,
+            RowCount = 14,
             AutoSize = true,
             Padding = new Padding(8)
         };
@@ -76,9 +93,12 @@ public sealed partial class MainForm
         AddLabeledRow(table, 3, "Knowledge Base", _weKnoraKnowledgeBaseComboBox, _loadWeKnoraKnowledgeBasesButton);
         AddLabeledRow(table, 4, "KB Name", _weKnoraKnowledgeBaseNameTextBox, _createWeKnoraKnowledgeBaseButton);
         AddLabeledRow(table, 5, "KB ID", _weKnoraKnowledgeBaseIdTextBox, new Label { Text = "Optional exact target. Leave empty to match by name.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
-        AddLabeledRow(table, 6, "Chat Model ID", _weKnoraChatModelIdTextBox, new Label { Text = "Optional KnowledgeQA model from /api/v1/models.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
-        AddLabeledRow(table, 7, "Embedding Model ID", _weKnoraEmbeddingModelIdTextBox, new Label { Text = "Optional Embedding model from /api/v1/models. Leave empty to use the server default.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
-        AddLabeledRow(table, 8, "Multimodal ID", _weKnoraMultimodalModelIdTextBox, new Label { Text = "Optional VLLM model from /api/v1/models.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
+        AddLabeledRow(table, 6, "KB Description", _weKnoraKnowledgeBaseDescriptionTextBox, new Label { Text = "Used when creating or auto-creating a knowledge base.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
+        AddLabeledRow(table, 7, "Chunk Size", _weKnoraChunkSizeUpDown, new Label { Text = "Chunk size for new knowledge bases.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
+        AddLabeledRow(table, 8, "Chunk Overlap", _weKnoraChunkOverlapUpDown, new Label { Text = "Overlap applied between adjacent chunks.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
+        AddLabeledRow(table, 9, "Chat Model ID", _weKnoraChatModelIdComboBox, _loadWeKnoraModelsButton);
+        AddLabeledRow(table, 10, "Embedding Model ID", _weKnoraEmbeddingModelIdComboBox, new Label { Text = "Optional Embedding model from /api/v1/models. Leave empty to use the server default.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
+        AddLabeledRow(table, 11, "Multimodal ID", _weKnoraMultimodalModelIdComboBox, new Label { Text = "Optional VLLM model from /api/v1/models.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
 
         var optionsPanel = new FlowLayoutPanel
         {
@@ -90,18 +110,19 @@ public sealed partial class MainForm
         };
         optionsPanel.Controls.Add(_weKnoraAutoCreateKnowledgeBaseCheckBox);
         optionsPanel.Controls.Add(_weKnoraAppendMetadataCheckBox);
-        table.Controls.Add(optionsPanel, 1, 9);
+        optionsPanel.Controls.Add(_weKnoraEnableParentChildCheckBox);
+        table.Controls.Add(optionsPanel, 1, 12);
         table.SetColumnSpan(optionsPanel, 2);
 
         var helperLabel = new Label
         {
-            Text = "Choose an existing knowledge base from the server, or type a new KB name and click Create KB. Optional chat, embedding, and multimodal model IDs are applied when a KB is created and again before each sync. The current sync implementation uploads each exported article as manual Markdown knowledge and keeps per-article checkpoints for pause/resume recovery.",
+            Text = "Choose an existing knowledge base from the server, or type a new KB name and click Create KB. New knowledge bases use the description, chunk size, chunk overlap, and parent-child settings above. Use Load Models to fetch live KnowledgeQA, Embedding, and VLLM model IDs from WeKnora before creating a KB or starting a sync.",
             Dock = DockStyle.Fill,
             AutoSize = true,
             MaximumSize = new Size(430, 0),
             Margin = new Padding(3, 12, 3, 3)
         };
-        table.Controls.Add(helperLabel, 1, 10);
+        table.Controls.Add(helperLabel, 1, 13);
         table.SetColumnSpan(helperLabel, 2);
 
         group.Controls.Add(table);
@@ -269,6 +290,7 @@ public sealed partial class MainForm
     {
         _testWeKnoraConnectionButton.Click += async (_, _) => await TestWeKnoraConnectionAsync();
         _loadWeKnoraKnowledgeBasesButton.Click += async (_, _) => await LoadWeKnoraKnowledgeBasesAsync();
+        _loadWeKnoraModelsButton.Click += async (_, _) => await LoadWeKnoraModelsAsync();
         _createWeKnoraKnowledgeBaseButton.Click += async (_, _) => await CreateWeKnoraKnowledgeBaseAsync();
         _startWeKnoraSyncButton.Click += async (_, _) => await StartSelectedWeKnoraSyncAsync();
         _pauseWeKnoraSyncButton.Click += async (_, _) => await PauseSelectedWeKnoraSyncAsync();
@@ -324,6 +346,7 @@ public sealed partial class MainForm
         try
         {
             await LoadWeKnoraKnowledgeBasesAsync(silent: true);
+            await LoadWeKnoraModelsAsync(silent: true);
         }
         catch
         {
@@ -340,6 +363,7 @@ public sealed partial class MainForm
         if (result.IsAvailable)
         {
             await LoadWeKnoraKnowledgeBasesAsync(silent: true);
+            await LoadWeKnoraModelsAsync(silent: true);
         }
     }
 
@@ -352,6 +376,18 @@ public sealed partial class MainForm
         if (!silent)
         {
             SetStatus($"Loaded {knowledgeBases.Count} WeKnora knowledge base(s).");
+        }
+    }
+
+    private async Task LoadWeKnoraModelsAsync(bool silent = false)
+    {
+        await SaveSettingsAsync(silent: true);
+        var models = await _appService.GetWeKnoraModelsAsync();
+        PopulateWeKnoraModelChoices(models);
+
+        if (!silent)
+        {
+            SetStatus($"Loaded {models.Count} WeKnora model(s).");
         }
     }
 
@@ -389,6 +425,93 @@ public sealed partial class MainForm
 
         _weKnoraKnowledgeBaseIdTextBox.Text = choice.Id;
         _weKnoraKnowledgeBaseNameTextBox.Text = choice.Name;
+    }
+
+    private void PopulateWeKnoraModelChoices(IReadOnlyList<WeKnoraModelInfo> models)
+    {
+        _loadedWeKnoraModels = models.ToList();
+        PopulateWeKnoraModelComboBox(_weKnoraChatModelIdComboBox, _loadedWeKnoraModels.Where(static model => string.Equals(model.Type, "KnowledgeQA", StringComparison.OrdinalIgnoreCase)), GetWeKnoraModelSelection(_weKnoraChatModelIdComboBox));
+        PopulateWeKnoraModelComboBox(_weKnoraEmbeddingModelIdComboBox, _loadedWeKnoraModels.Where(static model => string.Equals(model.Type, "Embedding", StringComparison.OrdinalIgnoreCase)), GetWeKnoraModelSelection(_weKnoraEmbeddingModelIdComboBox));
+        PopulateWeKnoraModelComboBox(_weKnoraMultimodalModelIdComboBox, _loadedWeKnoraModels.Where(static model => string.Equals(model.Type, "VLLM", StringComparison.OrdinalIgnoreCase)), GetWeKnoraModelSelection(_weKnoraMultimodalModelIdComboBox));
+    }
+
+    private static void PopulateWeKnoraModelComboBox(ComboBox comboBox, IEnumerable<WeKnoraModelInfo> models, string? selectedModelId)
+    {
+        var choices = models
+            .OrderByDescending(static model => model.IsDefault)
+            .ThenBy(static model => model.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(static model => new ModelChoice
+            {
+                Id = model.Id,
+                DisplayText = BuildWeKnoraModelDisplayText(model)
+            })
+            .ToList();
+
+        choices.Insert(0, new ModelChoice
+        {
+            Id = string.Empty,
+            DisplayText = "(Use server default or leave empty)"
+        });
+
+        comboBox.DisplayMember = nameof(ModelChoice.DisplayText);
+        comboBox.ValueMember = nameof(ModelChoice.Id);
+        comboBox.DataSource = choices;
+
+        if (string.IsNullOrWhiteSpace(selectedModelId))
+        {
+            comboBox.SelectedIndex = 0;
+            return;
+        }
+
+        var match = choices.FindIndex(choice => string.Equals(choice.Id, selectedModelId.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (match >= 0)
+        {
+            comboBox.SelectedIndex = match;
+            return;
+        }
+
+        comboBox.SelectedIndex = 0;
+        comboBox.Text = selectedModelId.Trim();
+    }
+
+    private static string BuildWeKnoraModelDisplayText(WeKnoraModelInfo model)
+    {
+        var details = new List<string>();
+        if (!string.IsNullOrWhiteSpace(model.Type))
+        {
+            details.Add(model.Type);
+        }
+
+        if (!string.IsNullOrWhiteSpace(model.Provider))
+        {
+            details.Add(model.Provider);
+        }
+
+        if (model.IsDefault)
+        {
+            details.Add("default");
+        }
+
+        return details.Count == 0
+            ? $"{model.Name} [{model.Id}]"
+            : $"{model.Name} [{model.Id}] - {string.Join(", ", details)}";
+    }
+
+    private static string? GetWeKnoraModelSelection(ComboBox comboBox)
+    {
+        if (comboBox.SelectedItem is ModelChoice choice)
+        {
+            var rawText = comboBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(rawText) || string.Equals(rawText, choice.DisplayText, StringComparison.Ordinal))
+            {
+                return string.IsNullOrWhiteSpace(choice.Id) ? null : choice.Id;
+            }
+        }
+
+        var rawValue = comboBox.Text.Trim();
+        return string.IsNullOrWhiteSpace(rawValue) || rawValue.StartsWith("(Use server default", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : rawValue;
     }
 
     private async Task CreateWeKnoraKnowledgeBaseAsync()
@@ -549,6 +672,13 @@ public sealed partial class MainForm
         public string Id { get; init; } = string.Empty;
 
         public string Name { get; init; } = string.Empty;
+
+        public string DisplayText { get; init; } = string.Empty;
+    }
+
+    private sealed class ModelChoice
+    {
+        public string Id { get; init; } = string.Empty;
 
         public string DisplayText { get; init; } = string.Empty;
     }

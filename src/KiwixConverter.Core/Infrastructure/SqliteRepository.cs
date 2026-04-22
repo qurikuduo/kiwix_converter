@@ -201,6 +201,9 @@ CREATE TABLE IF NOT EXISTS weknora_sync_log_entries (
                 case "weKnoraKnowledgeBaseName":
                     settings.WeKnoraKnowledgeBaseName = value;
                     break;
+                case "weKnoraKnowledgeBaseDescription":
+                    settings.WeKnoraKnowledgeBaseDescription = value;
+                    break;
                 case "weKnoraChatModelId":
                     settings.WeKnoraChatModelId = value;
                     break;
@@ -209,6 +212,31 @@ CREATE TABLE IF NOT EXISTS weknora_sync_log_entries (
                     break;
                 case "weKnoraMultimodalModelId":
                     settings.WeKnoraMultimodalModelId = value;
+                    break;
+                case "weKnoraChunkSize":
+                    if (int.TryParse(value, out var chunkSize))
+                    {
+                        settings.WeKnoraChunkSize = Math.Max(100, chunkSize);
+                    }
+
+                    break;
+                case "weKnoraChunkOverlap":
+                    if (int.TryParse(value, out var chunkOverlap))
+                    {
+                        settings.WeKnoraChunkOverlap = Math.Max(0, chunkOverlap);
+                    }
+
+                    break;
+                case "weKnoraEnableParentChild":
+                    if (bool.TryParse(value, out var enableParentChild))
+                    {
+                        settings.WeKnoraEnableParentChild = enableParentChild;
+                    }
+                    else if (int.TryParse(value, out var enableParentChildInt))
+                    {
+                        settings.WeKnoraEnableParentChild = enableParentChildInt != 0;
+                    }
+
                     break;
                 case "weKnoraAuthMode":
                     if (Enum.TryParse<WeKnoraAuthMode>(value, out var authMode))
@@ -258,9 +286,13 @@ CREATE TABLE IF NOT EXISTS weknora_sync_log_entries (
         await UpsertSettingAsync(connection, transaction, "weKnoraAccessToken", settings.WeKnoraAccessToken, cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraKnowledgeBaseId", settings.WeKnoraKnowledgeBaseId, cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraKnowledgeBaseName", settings.WeKnoraKnowledgeBaseName, cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "weKnoraKnowledgeBaseDescription", settings.WeKnoraKnowledgeBaseDescription, cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraChatModelId", settings.WeKnoraChatModelId, cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraEmbeddingModelId", settings.WeKnoraEmbeddingModelId, cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraMultimodalModelId", settings.WeKnoraMultimodalModelId, cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "weKnoraChunkSize", settings.WeKnoraChunkSize.ToString(CultureInfo.InvariantCulture), cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "weKnoraChunkOverlap", settings.WeKnoraChunkOverlap.ToString(CultureInfo.InvariantCulture), cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "weKnoraEnableParentChild", settings.WeKnoraEnableParentChild.ToString(), cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraAuthMode", settings.WeKnoraAuthMode.ToString(), cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraAutoCreateKnowledgeBase", settings.WeKnoraAutoCreateKnowledgeBase.ToString(), cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraAppendMetadataBlock", settings.WeKnoraAppendMetadataBlock.ToString(), cancellationToken);

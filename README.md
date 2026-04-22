@@ -33,6 +33,21 @@ docs/
   architecture.md
 ```
 
+## Architecture
+
+- `KiwixConverter.WinForms` owns the desktop shell, settings entry, task grids, status surfaces, and operator workflows.
+- `KiwixConverter.Core` owns scanning, conversion, WeKnora sync, and SQLite-backed persistence so the UI stays thin.
+- `zimdump` is the archive access boundary for ZIM metadata, article lists, HTML, and resources.
+- The WeKnora HTTP API is the RAG sync boundary for knowledge base discovery, model loading, KB creation, and article upload.
+- Long-running work is modeled as persisted tasks with article-level checkpoints, so restarts do not force a full archive reconversion.
+
+## Technical Flow
+
+1. Directory scanning upserts the local ZIM inventory into SQLite before any conversion begins.
+2. Conversion calls `zimdump` for metadata and article HTML, extracts the main content, rewrites links, exports images, and emits Markdown plus JSON artifacts.
+3. Each article writes `content.md`, `metadata.json`, `chunks.jsonl`, and checkpoint state so a failure only retries the local slice that actually failed.
+4. WeKnora sync reads completed exports, loads live model IDs from `/api/v1/models`, resolves or creates knowledge bases with the configured chunk settings, and uploads per-article Markdown as resumable manual knowledge.
+
 ## Build Requirements
 
 - Windows

@@ -13,6 +13,13 @@ Kiwix Converter turns kiwix-desktop ZIM archives into article-level Markdown, me
 - Persistence: SQLite-backed settings, task checkpoints, archive metadata, and logs
 - Release automation: CI build packaging and semantic-version release publishing
 
+## Architecture And Data Flow
+
+- `KiwixConverter.WinForms` handles the operator-facing shell, while `KiwixConverter.Core` handles scanning, conversion, sync, and persistence.
+- Directory scans upsert ZIM inventory into SQLite before conversion starts.
+- Conversion uses `zimdump` to fetch metadata and article HTML, then emits Markdown, metadata JSON, chunks, and image folders.
+- WeKnora sync can load live model IDs from `/api/v1/models`, create or reuse KBs with chunk settings, and upload article Markdown with resumable task state.
+
 ## Getting Started
 
 For non-developer users, the easiest route is:

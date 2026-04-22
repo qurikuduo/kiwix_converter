@@ -25,6 +25,21 @@ Kiwix Converter は、kiwix-desktop でダウンロードした ZIM アーカイ
 - ソースからビルドする場合は .NET 8 SDK
 - `zimdump` が `PATH` にある、またはアプリからパス指定できること
 
+## アーキテクチャ設計
+
+- `KiwixConverter.WinForms` はデスクトップシェル、設定入力、タスク一覧、状態表示、運用フローを担当します。
+- `KiwixConverter.Core` はスキャン、変換、WeKnora 同期、SQLite 永続化を担当し、UI 層を薄く保ちます。
+- ZIM アーカイブへのアクセス境界は `zimdump` で、メタデータ、記事一覧、本文 HTML、リソース取得を一元化します。
+- RAG 同期の境界は WeKnora HTTP API で、ナレッジベース探索、モデル読込、KB 作成、記事アップロードを扱います。
+- 長時間処理は記事単位のチェックポイントを持つ永続化タスクとして管理されるため、再起動後も全アーカイブのやり直しは不要です。
+
+## 技術フロー
+
+1. ディレクトリ走査でローカル ZIM 在庫を SQLite に upsert してから変換を開始します。
+2. 変換では `zimdump` からメタデータと記事 HTML を取得し、本文抽出、リンク書き換え、画像出力、Markdown と JSON の生成を行います。
+3. 各記事は `content.md`、`metadata.json`、`chunks.jsonl`、チェックポイントを書き出すため、失敗してもその局所スライスだけを再試行できます。
+4. WeKnora 同期では完了済みエクスポートを読み込み、`/api/v1/models` からライブのモデル ID を取得し、chunk 設定付きの KB を解決または作成し、記事単位の Markdown を再開可能な形で送信します。
+
 ## 初心者向けクイックスタート
 
 アプリを使うだけなら、GitHub Release の Windows zip をダウンロードし、.NET 8 Desktop Runtime をインストールするのが最も簡単です。Visual Studio で開いたり、`dotnet build` で自分でビルドしたりする場合だけ .NET 8 SDK が必要です。

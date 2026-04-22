@@ -96,6 +96,21 @@ docs/
   wiki/
 ```
 
+## 架构设计
+
+- `KiwixConverter.WinForms` 负责桌面壳层、设置录入、任务表格、状态展示和人工操作流程。
+- `KiwixConverter.Core` 负责扫描、转换、WeKnora 同步和基于 SQLite 的持久化，让界面层保持轻量。
+- ZIM 档案访问统一通过 `zimdump` 完成，覆盖元数据、文章列表、正文 HTML 和资源导出。
+- WeKnora HTTP API 是 RAG 同步边界，负责知识库发现、模型加载、知识库创建和文章上传。
+- 所有长任务都建模为可持久化任务，并带有文章级检查点，因此程序重启后不需要整包重转。
+
+## 技术实现流程
+
+1. 目录扫描阶段先把本地 ZIM 清单 upsert 到 SQLite，然后才进入转换流程。
+2. 转换阶段通过 `zimdump` 获取元数据和文章 HTML，再完成正文抽取、链接重写、图片导出，以及 Markdown 和 JSON 产物生成。
+3. 每篇文章都会写出 `content.md`、`metadata.json`、`chunks.jsonl` 和检查点，所以失败时只重试真正出错的局部切片。
+4. WeKnora 同步阶段会读取已完成导出、从 `/api/v1/models` 加载实时模型 ID、解析或创建带 chunk 参数的知识库，并以可恢复方式按文章上传 Markdown 知识。
+
 ## 使用流程
 
 1. 如果你运行的是发布包，请先安装 .NET 8 Desktop Runtime；如果你是从源码运行，请先安装 .NET 8 SDK。

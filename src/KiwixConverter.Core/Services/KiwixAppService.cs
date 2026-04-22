@@ -151,6 +151,12 @@ public sealed class KiwixAppService
         return await _weKnoraClient.ListKnowledgeBasesAsync(settings, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<WeKnoraModelInfo>> GetWeKnoraModelsAsync(CancellationToken cancellationToken = default)
+    {
+        var settings = await _repository.GetSettingsAsync(cancellationToken);
+        return await _weKnoraClient.ListModelsAsync(settings, cancellationToken);
+    }
+
     public async Task<WeKnoraKnowledgeBaseInfo> CreateWeKnoraKnowledgeBaseAsync(string knowledgeBaseName, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(knowledgeBaseName))
@@ -172,7 +178,9 @@ public sealed class KiwixAppService
         var knowledgeBase = await _weKnoraClient.CreateKnowledgeBaseAsync(
             settings,
             knowledgeBaseName.Trim(),
-            "Imported Markdown articles from Kiwix Converter.",
+            string.IsNullOrWhiteSpace(settings.WeKnoraKnowledgeBaseDescription)
+                ? "Imported Markdown articles from Kiwix Converter."
+                : settings.WeKnoraKnowledgeBaseDescription.Trim(),
             cancellationToken);
 
         await ApplyConfiguredWeKnoraModelsAsync(settings, knowledgeBase.Id, cancellationToken);
@@ -289,7 +297,13 @@ public sealed class KiwixAppService
 
             if (settings.WeKnoraAutoCreateKnowledgeBase)
             {
-                return await _weKnoraClient.CreateKnowledgeBaseAsync(settings, settings.WeKnoraKnowledgeBaseName.Trim(), "Imported Markdown articles from Kiwix Converter.", cancellationToken);
+                return await _weKnoraClient.CreateKnowledgeBaseAsync(
+                    settings,
+                    settings.WeKnoraKnowledgeBaseName.Trim(),
+                    string.IsNullOrWhiteSpace(settings.WeKnoraKnowledgeBaseDescription)
+                        ? "Imported Markdown articles from Kiwix Converter."
+                        : settings.WeKnoraKnowledgeBaseDescription.Trim(),
+                    cancellationToken);
             }
         }
 

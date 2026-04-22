@@ -50,11 +50,19 @@ public sealed class AppSettings
 
     public string? WeKnoraKnowledgeBaseName { get; set; }
 
+    public string? WeKnoraKnowledgeBaseDescription { get; set; }
+
     public string? WeKnoraChatModelId { get; set; }
 
     public string? WeKnoraEmbeddingModelId { get; set; }
 
     public string? WeKnoraMultimodalModelId { get; set; }
+
+    public int WeKnoraChunkSize { get; set; } = 1000;
+
+    public int WeKnoraChunkOverlap { get; set; } = 200;
+
+    public bool WeKnoraEnableParentChild { get; set; }
 
     public WeKnoraAuthMode WeKnoraAuthMode { get; set; } = WeKnoraAuthMode.ApiKey;
 
@@ -199,6 +207,19 @@ public sealed class WeKnoraKnowledgeBaseInfo
     public bool IsTemporary { get; set; }
 
     public string? StorageProvider { get; set; }
+}
+
+public sealed class WeKnoraModelInfo
+{
+    public string Id { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+
+    public string Type { get; set; } = string.Empty;
+
+    public string? Provider { get; set; }
+
+    public bool IsDefault { get; set; }
 }
 
 public sealed class WeKnoraKnowledgeItemInfo

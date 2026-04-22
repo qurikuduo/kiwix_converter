@@ -13,6 +13,13 @@ Kiwix Converter は、kiwix-desktop の ZIM アーカイブを記事単位の Ma
 - 永続化: SQLite による設定、タスクチェックポイント、アーカイブメタデータ、ログ
 - リリース自動化: CI ビルド、パッケージ化、セマンティックバージョンのリリース
 
+## アーキテクチャとデータフロー
+
+- `KiwixConverter.WinForms` がオペレーター向けシェルを担当し、`KiwixConverter.Core` がスキャン、変換、同期、永続化を担当します。
+- ディレクトリ走査は変換前に ZIM 在庫を SQLite に upsert します。
+- 変換は `zimdump` でメタデータと記事 HTML を取得し、Markdown、メタデータ JSON、チャンク、画像フォルダーを生成します。
+- WeKnora 同期は `/api/v1/models` からライブのモデル ID を読み込み、chunk 設定付きで KB を作成または再利用し、記事 Markdown を再開可能な状態でアップロードします。
+
 ## クイックスタート
 
 非開発者にとって最も簡単な流れは次のとおりです。

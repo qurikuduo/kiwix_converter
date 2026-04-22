@@ -14,6 +14,8 @@ public sealed class WeKnoraClient
         Timeout = TimeSpan.FromMinutes(2)
     };
 
+    private static readonly string[] DefaultChunkSeparators = ["\n\n", "\n", "。", "！", "？", ".", "!", "?", ";", "；"];
+
     public async Task<IReadOnlyList<WeKnoraKnowledgeBaseInfo>> ListKnowledgeBasesAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
         using var request = CreateRequest(HttpMethod.Get, settings, "/knowledge-bases");
@@ -33,12 +35,33 @@ public sealed class WeKnoraClient
         return results;
     }
 
+    public async Task<IReadOnlyList<WeKnoraModelInfo>> ListModelsAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    {
+        using var request = CreateRequest(HttpMethod.Get, settings, "/models");
+        using var document = await SendForDocumentAsync(request, cancellationToken);
+        var data = GetDataElement(document.RootElement);
+        if (data.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var results = new List<WeKnoraModelInfo>();
+        foreach (var item in data.EnumerateArray())
+        {
+            results.Add(ReadModel(item));
+        }
+
+        return results;
+    }
+
     public async Task<WeKnoraKnowledgeBaseInfo> CreateKnowledgeBaseAsync(
         AppSettings settings,
         string name,
         string? description = null,
         CancellationToken cancellationToken = default)
     {
+        var chunkSize = Math.Max(100, settings.WeKnoraChunkSize);
+        var chunkOverlap = Math.Max(0, Math.Min(settings.WeKnoraChunkOverlap, chunkSize - 1));
         var payload = new
         {
             name,
@@ -51,11 +74,11 @@ public sealed class WeKnoraClient
             },
             chunking_config = new
             {
-                chunk_size = 1000,
-                chunk_overlap = 200,
-                separators = new[] { "\n\n", "\n", "。", "！", "？", ".", "!", "?", ";", "；" },
+                chunk_size = chunkSize,
+                chunk_overlap = chunkOverlap,
+                separators = DefaultChunkSeparators,
                 enable_multimodal = !string.IsNullOrWhiteSpace(settings.WeKnoraMultimodalModelId),
-                enable_parent_child = false
+                enable_parent_child = settings.WeKnoraEnableParentChild
             }
         };
 
@@ -160,35 +183,27 @@ public sealed class WeKnoraClient
 
     private async Task<(string? KnowledgeQaModelId, string? EmbeddingModelId)> ResolveDefaultModelIdsAsync(AppSettings settings, CancellationToken cancellationToken)
     {
-        using var request = CreateRequest(HttpMethod.Get, settings, "/models");
-        using var document = await SendForDocumentAsync(request, cancellationToken);
-        var data = GetDataElement(document.RootElement);
-        if (data.ValueKind != JsonValueKind.Array)
-        {
-            return (null, null);
-        }
-
+        var models = await ListModelsAsync(settings, cancellationToken);
         string? knowledgeQaModelId = null;
         string? embeddingModelId = null;
 
-        foreach (var item in data.EnumerateArray())
+        foreach (var item in models)
         {
-            var modelType = ReadString(item, "type");
-            var modelId = NormalizeModelId(ReadString(item, "id"));
+            var modelType = item.Type;
+            var modelId = NormalizeModelId(item.Id);
             if (modelId is null || string.IsNullOrWhiteSpace(modelType))
             {
                 continue;
             }
 
-            var isDefault = ReadBoolean(item, "is_default");
             if (string.Equals(modelType, "KnowledgeQA", StringComparison.OrdinalIgnoreCase)
-                && (knowledgeQaModelId is null || isDefault))
+                && (knowledgeQaModelId is null || item.IsDefault))
             {
                 knowledgeQaModelId = modelId;
             }
 
             if (string.Equals(modelType, "Embedding", StringComparison.OrdinalIgnoreCase)
-                && (embeddingModelId is null || isDefault))
+                && (embeddingModelId is null || item.IsDefault))
             {
                 embeddingModelId = modelId;
             }
@@ -404,6 +419,22 @@ public sealed class WeKnoraClient
             Type = ReadString(element, "type") ?? "document",
             IsTemporary = ReadBoolean(element, "is_temporary"),
             StorageProvider = storageProvider
+        };
+    }
+
+    private static WeKnoraModelInfo ReadModel(JsonElement element)
+    {
+        return new WeKnoraModelInfo
+        {
+            Id = ReadString(element, "id") ?? string.Empty,
+            Name = ReadString(element, "name")
+                ?? ReadString(element, "model_name")
+                ?? ReadString(element, "model")
+                ?? ReadString(element, "id")
+                ?? string.Empty,
+            Type = ReadString(element, "type") ?? string.Empty,
+            Provider = ReadString(element, "provider") ?? ReadString(element, "provider_type"),
+            IsDefault = ReadBoolean(element, "is_default")
         };
     }
 

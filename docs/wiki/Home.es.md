@@ -13,6 +13,13 @@ Kiwix Converter transforma archivos ZIM de kiwix-desktop en Markdown por artícu
 - Persistencia: configuración, checkpoints, metadatos y logs almacenados en SQLite
 - Automatización: CI, empaquetado y publicación de releases con versiones semánticas
 
+## Arquitectura y flujo de datos
+
+- `KiwixConverter.WinForms` gestiona la shell para operadores, mientras `KiwixConverter.Core` gestiona escaneo, conversión, sincronización y persistencia.
+- El escaneo del directorio hace upsert del inventario ZIM en SQLite antes de comenzar la conversión.
+- La conversión usa `zimdump` para obtener metadatos y HTML, y luego genera Markdown, metadatos JSON, chunks y carpetas de imágenes.
+- La sincronización con WeKnora puede cargar IDs de modelos desde `/api/v1/models`, crear o reutilizar KB con configuración de chunk y subir Markdown por artículo con estado reanudable.
+
 ## Inicio rápido
 
 Para usuarios no técnicos, la ruta más sencilla es:

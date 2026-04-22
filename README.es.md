@@ -25,6 +25,21 @@ Kiwix Converter es una aplicación de escritorio WinForms + SQLite para converti
 - .NET 8 SDK si quieres compilar el proyecto desde el código fuente
 - `zimdump` disponible en `PATH` o configurado desde la interfaz
 
+## Diseño de arquitectura
+
+- `KiwixConverter.WinForms` controla la shell de escritorio, la entrada de configuración, las tablas de tareas, los estados visibles y el flujo operativo del usuario.
+- `KiwixConverter.Core` concentra el escaneo, la conversión, la sincronización con WeKnora y la persistencia en SQLite para mantener delgada la capa de UI.
+- `zimdump` es el límite de acceso a los archivos ZIM para metadatos, listados de artículos, HTML y recursos.
+- La API HTTP de WeKnora es el límite de sincronización RAG para descubrir bases, cargar modelos, crear KB y subir artículos.
+- El trabajo de larga duración se modela como tareas persistidas con checkpoints por artículo, por lo que un reinicio no obliga a reconvertir todo el archivo.
+
+## Flujo técnico
+
+1. El escaneo del directorio hace upsert del inventario local de ZIM en SQLite antes de iniciar cualquier conversión.
+2. La conversión usa `zimdump` para obtener metadatos y HTML, extrae el contenido principal, reescribe enlaces, exporta imágenes y genera artefactos Markdown y JSON.
+3. Cada artículo guarda `content.md`, `metadata.json`, `chunks.jsonl` y su checkpoint, de modo que un fallo solo repite el tramo local que realmente falló.
+4. La sincronización con WeKnora lee exportaciones completadas, carga IDs de modelos desde `/api/v1/models`, resuelve o crea bases con la configuración de chunk y sube el Markdown por artículo como conocimiento manual reanudable.
+
 ## Inicio rápido para usuarios no técnicos
 
 Si solo quieres usar la aplicación, lo más fácil es descargar el zip de GitHub Releases e instalar .NET 8 Desktop Runtime. Solo necesitas el SDK completo si vas a abrir la solución en Visual Studio o compilarla tú mismo con `dotnet build`.
