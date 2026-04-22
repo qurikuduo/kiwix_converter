@@ -65,12 +65,14 @@ En `WeKnora Sync Configuration` debes configurar:
 - el modo de autenticación: `API Key` o `Bearer Token`
 - el token de acceso
 - el ID o el nombre de la base de conocimiento
+- los IDs opcionales de modelos `KnowledgeQA`, `Embedding` y `VLLM`, obtenidos desde `/api/v1/models`
 - si la aplicación puede crear la base automáticamente cuando el nombre no exista
 
 La interfaz de sincronización permite:
 
 - cargar las bases de conocimiento disponibles desde el servidor
 - probar la conexión antes de sincronizar
+- volver a aplicar los modelos configurados de chat, embedding y multimodal cuando se crea una base o se inicia una sincronización
 - seleccionar salidas de conversión completadas para enviarlas a WeKnora
 - revisar historial, registros, progreso, ETA y estado de pausa/reanudación
 

@@ -41,6 +41,8 @@ Kiwix Converter は、kiwix-desktop の ZIM アーカイブを記事単位の Ma
 - ベース URL と `API Key` / `Bearer Token` 認証
 - WeKnora サーバーからのナレッジベース一覧取得
 - 有効時の名前ベース自動作成
+- `/api/v1/models` から取得した `KnowledgeQA`、`Embedding`、`VLLM` モデル ID の設定
+- ナレッジベース作成時や同期開始時に設定済みのチャット、Embedding、マルチモーダルモデルを再適用
 - 完了した変換出力の選択と同期
 - 同期履歴、タスク別ログ、進捗、ETA、停止/再開、再開可能なチェックポイント
 

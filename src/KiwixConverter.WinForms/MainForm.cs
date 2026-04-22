@@ -1,4 +1,5 @@
 using System.Globalization;
+using KiwixConverter.Core.Infrastructure;
 using KiwixConverter.Core.Models;
 using KiwixConverter.Core.Services;
 
@@ -17,6 +18,13 @@ public sealed partial class MainForm : Form
     private readonly TextBox _taskOutputOverrideTextBox = new() { Dock = DockStyle.Fill };
     private readonly TextBox _historySearchTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Search by path, status, output directory or error..." };
     private readonly TextBox _logSearchTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Search logs by message, category or article URL..." };
+    private readonly SplitContainer _rootSplitContainer = new()
+    {
+        Dock = DockStyle.Fill,
+        Orientation = Orientation.Vertical,
+        Panel1MinSize = 420,
+        Panel2MinSize = 600
+    };
 
     private readonly DataGridView _downloadsGrid = CreateGrid();
     private readonly DataGridView _tasksGrid = CreateGrid();
@@ -59,6 +67,7 @@ public sealed partial class MainForm : Form
     protected override async void OnShown(EventArgs e)
     {
         base.OnShown(e);
+        EnsureRootSplitterDistance();
         await InitializeAsync();
     }
 
@@ -72,23 +81,29 @@ public sealed partial class MainForm : Form
 
     private void BuildLayout()
     {
-        var root = new SplitContainer
-        {
-            Dock = DockStyle.Fill,
-            Orientation = Orientation.Vertical,
-            SplitterDistance = 520,
-            Panel1MinSize = 420,
-            Panel2MinSize = 600
-        };
-
-        root.Panel1.Controls.Add(BuildLeftPanel());
-        root.Panel2.Controls.Add(BuildRightPanel());
+        _rootSplitContainer.Panel1.Controls.Add(BuildLeftPanel());
+        _rootSplitContainer.Panel2.Controls.Add(BuildRightPanel());
 
         var statusStrip = new StatusStrip();
         statusStrip.Items.Add(_statusLabel);
 
-        Controls.Add(root);
+        Controls.Add(_rootSplitContainer);
         Controls.Add(statusStrip);
+    }
+
+    private void EnsureRootSplitterDistance()
+    {
+        var maxSplitterDistance = _rootSplitContainer.Width - _rootSplitContainer.Panel2MinSize;
+        if (maxSplitterDistance < _rootSplitContainer.Panel1MinSize)
+        {
+            return;
+        }
+
+        var desiredSplitterDistance = Math.Max(_rootSplitContainer.Panel1MinSize, Math.Min(520, maxSplitterDistance));
+        if (_rootSplitContainer.SplitterDistance != desiredSplitterDistance)
+        {
+            _rootSplitContainer.SplitterDistance = desiredSplitterDistance;
+        }
     }
 
     private Control BuildLeftPanel()
@@ -376,8 +391,9 @@ public sealed partial class MainForm : Form
         }
         catch (Exception exception)
         {
-            MessageBox.Show(this, exception.Message, "Initialization Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            Close();
+            var startupLogPath = Path.Combine(AppPaths.ApplicationDataDirectory, "startup-error.log");
+            File.WriteAllText(startupLogPath, exception.ToString());
+            SetStatus($"Initialization failed. See {startupLogPath} for details.");
         }
     }
 
@@ -402,30 +418,22 @@ public sealed partial class MainForm : Form
 
     private async Task<bool> EnsureRequiredDirectoriesConfiguredAsync()
     {
+        var missingDirectories = new List<string>();
+
         if (!Directory.Exists(_kiwixDirectoryTextBox.Text))
         {
-            var selected = PromptForFolder("Select the kiwix-desktop directory. This is required before the application can continue.");
-            if (string.IsNullOrWhiteSpace(selected))
-            {
-                MessageBox.Show(this, "A kiwix-desktop directory is required. The application will close.", "Configuration Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                Close();
-                return false;
-            }
-
-            _kiwixDirectoryTextBox.Text = selected;
+            missingDirectories.Add("the kiwix-desktop directory");
         }
 
         if (!Directory.Exists(_defaultOutputDirectoryTextBox.Text))
         {
-            var selected = PromptForFolder("Select the default output directory. This is required before the application can continue.");
-            if (string.IsNullOrWhiteSpace(selected))
-            {
-                MessageBox.Show(this, "A default output directory is required. The application will close.", "Configuration Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                Close();
-                return false;
-            }
+            missingDirectories.Add("the default output directory");
+        }
 
-            _defaultOutputDirectoryTextBox.Text = selected;
+        if (missingDirectories.Count > 0)
+        {
+            SetStatus($"Configure {string.Join(" and ", missingDirectories)} before scanning or converting.");
+            return false;
         }
 
         await SaveSettingsAsync(silent: true);

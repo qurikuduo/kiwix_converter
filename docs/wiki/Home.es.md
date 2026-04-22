@@ -41,6 +41,8 @@ El flujo actual de escritorio admite:
 - URL base y autenticación mediante `API Key` o `Bearer Token`
 - carga de bases de conocimiento desde el servidor de WeKnora
 - creación automática por nombre cuando está habilitada
+- configuración de IDs de modelos `KnowledgeQA`, `Embedding` y `VLLM` obtenidos desde `/api/v1/models`
+- reaplicación de los modelos configurados de chat, embedding y multimodal cada vez que se crea una base o se inicia una sincronización
 - selección de conversiones completadas para sincronizar
 - historial de sincronización, logs por tarea, progreso, ETA, pausa/reanudación y checkpoints reanudables
 
