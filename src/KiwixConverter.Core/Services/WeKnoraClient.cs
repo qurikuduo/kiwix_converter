@@ -127,21 +127,26 @@ public sealed class WeKnoraClient
         string? multimodalModelId,
         CancellationToken cancellationToken = default)
     {
-        var payload = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (!string.IsNullOrWhiteSpace(chatModelId))
-        {
-            payload["chat_model_id"] = chatModelId.Trim();
-        }
-
-        if (!string.IsNullOrWhiteSpace(multimodalModelId))
-        {
-            payload["multimodal_id"] = multimodalModelId.Trim();
-        }
-
-        if (payload.Count == 0)
+        var requestedChatModelId = NormalizeModelId(chatModelId);
+        var requestedMultimodalModelId = NormalizeModelId(multimodalModelId);
+        if (requestedChatModelId is null && requestedMultimodalModelId is null)
         {
             return;
         }
+
+        var (defaultKnowledgeQaModelId, defaultEmbeddingModelId) = await ResolveDefaultModelIdsAsync(settings, cancellationToken);
+        var resolvedChatModelId = requestedChatModelId ?? defaultKnowledgeQaModelId;
+        if (resolvedChatModelId is null)
+        {
+            throw new InvalidOperationException("WeKnora requires a KnowledgeQA model to initialize a knowledge base. Configure a chat model ID or ensure the server exposes a KnowledgeQA model.");
+        }
+
+        if (defaultEmbeddingModelId is null)
+        {
+            throw new InvalidOperationException("WeKnora requires an Embedding model to initialize a knowledge base. Ensure the server exposes at least one Embedding model.");
+        }
+
+        var payload = BuildInitializationPayload(resolvedChatModelId, defaultEmbeddingModelId, requestedMultimodalModelId);
 
         using var request = CreateJsonRequest(
             HttpMethod.Put,
@@ -149,6 +154,95 @@ public sealed class WeKnoraClient
             $"/initialization/config/{Uri.EscapeDataString(knowledgeBaseId)}",
             payload);
         using var _ = await SendForDocumentAsync(request, cancellationToken);
+    }
+
+    private async Task<(string? KnowledgeQaModelId, string? EmbeddingModelId)> ResolveDefaultModelIdsAsync(AppSettings settings, CancellationToken cancellationToken)
+    {
+        using var request = CreateRequest(HttpMethod.Get, settings, "/models");
+        using var document = await SendForDocumentAsync(request, cancellationToken);
+        var data = GetDataElement(document.RootElement);
+        if (data.ValueKind != JsonValueKind.Array)
+        {
+            return (null, null);
+        }
+
+        string? knowledgeQaModelId = null;
+        string? embeddingModelId = null;
+
+        foreach (var item in data.EnumerateArray())
+        {
+            var modelType = ReadString(item, "type");
+            var modelId = NormalizeModelId(ReadString(item, "id"));
+            if (modelId is null || string.IsNullOrWhiteSpace(modelType))
+            {
+                continue;
+            }
+
+            var isDefault = ReadBoolean(item, "is_default");
+            if (string.Equals(modelType, "KnowledgeQA", StringComparison.OrdinalIgnoreCase)
+                && (knowledgeQaModelId is null || isDefault))
+            {
+                knowledgeQaModelId = modelId;
+            }
+
+            if (string.Equals(modelType, "Embedding", StringComparison.OrdinalIgnoreCase)
+                && (embeddingModelId is null || isDefault))
+            {
+                embeddingModelId = modelId;
+            }
+        }
+
+        return (knowledgeQaModelId, embeddingModelId);
+    }
+
+    private static Dictionary<string, object> BuildInitializationPayload(string chatModelId, string embeddingModelId, string? multimodalModelId)
+    {
+        var payload = new Dictionary<string, object>(StringComparer.Ordinal)
+        {
+            ["LLMModelID"] = chatModelId,
+            ["EmbeddingModelID"] = embeddingModelId,
+            ["llm_model_id"] = chatModelId,
+            ["embedding_model_id"] = embeddingModelId,
+            ["chat_model_id"] = chatModelId
+        };
+
+        if (multimodalModelId is not null)
+        {
+            payload["VLMModelID"] = multimodalModelId;
+            payload["vlm_model_id"] = multimodalModelId;
+            payload["MultimodalModelID"] = multimodalModelId;
+            payload["multimodal_id"] = multimodalModelId;
+            payload["EnableMultimodal"] = true;
+            payload["enable_multimodal"] = true;
+            payload["multimodal"] = new Dictionary<string, object>(StringComparer.Ordinal)
+            {
+                ["enabled"] = true,
+                ["vlm"] = new Dictionary<string, object>(StringComparer.Ordinal)
+                {
+                    ["modelId"] = multimodalModelId,
+                    ["model_id"] = multimodalModelId
+                }
+            };
+            payload["multimodalConfig"] = new Dictionary<string, object>(StringComparer.Ordinal)
+            {
+                ["enabled"] = true,
+                ["vlmModelId"] = multimodalModelId,
+                ["vlm_model_id"] = multimodalModelId
+            };
+            payload["vlm_config"] = new Dictionary<string, object>(StringComparer.Ordinal)
+            {
+                ["enabled"] = true,
+                ["modelId"] = multimodalModelId,
+                ["model_id"] = multimodalModelId
+            };
+        }
+
+        return payload;
+    }
+
+    private static string? NormalizeModelId(string? modelId)
+    {
+        return string.IsNullOrWhiteSpace(modelId) ? null : modelId.Trim();
     }
 
     private static HttpRequestMessage CreateJsonRequest(HttpMethod method, AppSettings settings, string relativePath, object payload)
