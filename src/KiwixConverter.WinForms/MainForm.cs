@@ -393,6 +393,7 @@ public sealed partial class MainForm : Form
         _weKnoraKnowledgeBaseIdTextBox.Text = settings.WeKnoraKnowledgeBaseId ?? string.Empty;
         _weKnoraKnowledgeBaseNameTextBox.Text = settings.WeKnoraKnowledgeBaseName ?? string.Empty;
         _weKnoraChatModelIdTextBox.Text = settings.WeKnoraChatModelId ?? string.Empty;
+        _weKnoraEmbeddingModelIdTextBox.Text = settings.WeKnoraEmbeddingModelId ?? string.Empty;
         _weKnoraMultimodalModelIdTextBox.Text = settings.WeKnoraMultimodalModelId ?? string.Empty;
         _weKnoraAuthModeComboBox.SelectedItem = settings.WeKnoraAuthMode.ToString();
         _weKnoraAutoCreateKnowledgeBaseCheckBox.Checked = settings.WeKnoraAutoCreateKnowledgeBase;
@@ -444,6 +445,7 @@ public sealed partial class MainForm : Form
             WeKnoraKnowledgeBaseId = string.IsNullOrWhiteSpace(_weKnoraKnowledgeBaseIdTextBox.Text) ? null : _weKnoraKnowledgeBaseIdTextBox.Text.Trim(),
             WeKnoraKnowledgeBaseName = string.IsNullOrWhiteSpace(_weKnoraKnowledgeBaseNameTextBox.Text) ? null : _weKnoraKnowledgeBaseNameTextBox.Text.Trim(),
             WeKnoraChatModelId = string.IsNullOrWhiteSpace(_weKnoraChatModelIdTextBox.Text) ? null : _weKnoraChatModelIdTextBox.Text.Trim(),
+            WeKnoraEmbeddingModelId = string.IsNullOrWhiteSpace(_weKnoraEmbeddingModelIdTextBox.Text) ? null : _weKnoraEmbeddingModelIdTextBox.Text.Trim(),
             WeKnoraMultimodalModelId = string.IsNullOrWhiteSpace(_weKnoraMultimodalModelIdTextBox.Text) ? null : _weKnoraMultimodalModelIdTextBox.Text.Trim(),
             WeKnoraAuthMode = Enum.TryParse<WeKnoraAuthMode>(_weKnoraAuthModeComboBox.SelectedItem?.ToString(), out var authMode) ? authMode : WeKnoraAuthMode.ApiKey,
             WeKnoraAutoCreateKnowledgeBase = _weKnoraAutoCreateKnowledgeBaseCheckBox.Checked,

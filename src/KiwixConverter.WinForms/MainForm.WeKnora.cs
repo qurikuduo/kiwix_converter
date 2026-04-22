@@ -9,6 +9,7 @@ public sealed partial class MainForm
     private readonly TextBox _weKnoraKnowledgeBaseNameTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Existing or new knowledge base name" };
     private readonly TextBox _weKnoraKnowledgeBaseIdTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Optional explicit knowledge base ID" };
     private readonly TextBox _weKnoraChatModelIdTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Optional KnowledgeQA model ID" };
+    private readonly TextBox _weKnoraEmbeddingModelIdTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Optional Embedding model ID" };
     private readonly TextBox _weKnoraMultimodalModelIdTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Optional VLLM model ID" };
     private readonly ComboBox _weKnoraAuthModeComboBox = new() { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly ComboBox _weKnoraKnowledgeBaseComboBox = new() { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
@@ -61,7 +62,7 @@ public sealed partial class MainForm
         {
             Dock = DockStyle.Top,
             ColumnCount = 3,
-            RowCount = 10,
+            RowCount = 11,
             AutoSize = true,
             Padding = new Padding(8)
         };
@@ -76,7 +77,8 @@ public sealed partial class MainForm
         AddLabeledRow(table, 4, "KB Name", _weKnoraKnowledgeBaseNameTextBox, _createWeKnoraKnowledgeBaseButton);
         AddLabeledRow(table, 5, "KB ID", _weKnoraKnowledgeBaseIdTextBox, new Label { Text = "Optional exact target. Leave empty to match by name.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
         AddLabeledRow(table, 6, "Chat Model ID", _weKnoraChatModelIdTextBox, new Label { Text = "Optional KnowledgeQA model from /api/v1/models.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
-        AddLabeledRow(table, 7, "Multimodal ID", _weKnoraMultimodalModelIdTextBox, new Label { Text = "Optional VLLM model from /api/v1/models.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
+        AddLabeledRow(table, 7, "Embedding Model ID", _weKnoraEmbeddingModelIdTextBox, new Label { Text = "Optional Embedding model from /api/v1/models. Leave empty to use the server default.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
+        AddLabeledRow(table, 8, "Multimodal ID", _weKnoraMultimodalModelIdTextBox, new Label { Text = "Optional VLLM model from /api/v1/models.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
 
         var optionsPanel = new FlowLayoutPanel
         {
@@ -88,18 +90,18 @@ public sealed partial class MainForm
         };
         optionsPanel.Controls.Add(_weKnoraAutoCreateKnowledgeBaseCheckBox);
         optionsPanel.Controls.Add(_weKnoraAppendMetadataCheckBox);
-        table.Controls.Add(optionsPanel, 1, 8);
+        table.Controls.Add(optionsPanel, 1, 9);
         table.SetColumnSpan(optionsPanel, 2);
 
         var helperLabel = new Label
         {
-            Text = "Choose an existing knowledge base from the server, or type a new KB name and click Create KB. Optional chat and multimodal model IDs are applied when a KB is created and again before each sync. The current sync implementation uploads each exported article as manual Markdown knowledge and keeps per-article checkpoints for pause/resume recovery.",
+            Text = "Choose an existing knowledge base from the server, or type a new KB name and click Create KB. Optional chat, embedding, and multimodal model IDs are applied when a KB is created and again before each sync. The current sync implementation uploads each exported article as manual Markdown knowledge and keeps per-article checkpoints for pause/resume recovery.",
             Dock = DockStyle.Fill,
             AutoSize = true,
             MaximumSize = new Size(430, 0),
             Margin = new Padding(3, 12, 3, 3)
         };
-        table.Controls.Add(helperLabel, 1, 9);
+        table.Controls.Add(helperLabel, 1, 10);
         table.SetColumnSpan(helperLabel, 2);
 
         group.Controls.Add(table);

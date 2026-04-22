@@ -128,25 +128,27 @@ public sealed class WeKnoraClient
         CancellationToken cancellationToken = default)
     {
         var requestedChatModelId = NormalizeModelId(chatModelId);
+        var requestedEmbeddingModelId = NormalizeModelId(settings.WeKnoraEmbeddingModelId);
         var requestedMultimodalModelId = NormalizeModelId(multimodalModelId);
-        if (requestedChatModelId is null && requestedMultimodalModelId is null)
+        if (requestedChatModelId is null && requestedEmbeddingModelId is null && requestedMultimodalModelId is null)
         {
             return;
         }
 
         var (defaultKnowledgeQaModelId, defaultEmbeddingModelId) = await ResolveDefaultModelIdsAsync(settings, cancellationToken);
         var resolvedChatModelId = requestedChatModelId ?? defaultKnowledgeQaModelId;
+        var resolvedEmbeddingModelId = requestedEmbeddingModelId ?? defaultEmbeddingModelId;
         if (resolvedChatModelId is null)
         {
             throw new InvalidOperationException("WeKnora requires a KnowledgeQA model to initialize a knowledge base. Configure a chat model ID or ensure the server exposes a KnowledgeQA model.");
         }
 
-        if (defaultEmbeddingModelId is null)
+        if (resolvedEmbeddingModelId is null)
         {
             throw new InvalidOperationException("WeKnora requires an Embedding model to initialize a knowledge base. Ensure the server exposes at least one Embedding model.");
         }
 
-        var payload = BuildInitializationPayload(resolvedChatModelId, defaultEmbeddingModelId, requestedMultimodalModelId);
+        var payload = BuildInitializationPayload(resolvedChatModelId, resolvedEmbeddingModelId, requestedMultimodalModelId);
 
         using var request = CreateJsonRequest(
             HttpMethod.Put,

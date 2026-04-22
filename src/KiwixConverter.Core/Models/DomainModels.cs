@@ -52,6 +52,8 @@ public sealed class AppSettings
 
     public string? WeKnoraChatModelId { get; set; }
 
+    public string? WeKnoraEmbeddingModelId { get; set; }
+
     public string? WeKnoraMultimodalModelId { get; set; }
 
     public WeKnoraAuthMode WeKnoraAuthMode { get; set; } = WeKnoraAuthMode.ApiKey;

@@ -41,6 +41,8 @@ The current desktop flow supports:
 - base URL plus `API Key` or `Bearer Token` authentication
 - loading knowledge bases from the WeKnora server
 - auto-creating a knowledge base by name when enabled
+- configuring `KnowledgeQA`, `Embedding`, and `VLLM` model IDs from `/api/v1/models`
+- reapplying the configured chat, embedding, and multimodal models whenever a knowledge base is created or a sync starts
 - selecting completed conversion outputs for sync
 - sync history, per-task logs, progress, ETA, pause/resume, and resumable checkpoints
 

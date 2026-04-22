@@ -88,12 +88,14 @@ In the new `WeKnora Sync Configuration` section, configure:
 - the auth mode: `API Key` or `Bearer Token`
 - the access token
 - a knowledge base ID or knowledge base name
+- optional `KnowledgeQA`, `Embedding`, and `VLLM` model IDs from `/api/v1/models`
 - whether the app may auto-create the knowledge base if the name does not exist
 
 The sync UI lets you:
 
 - load available knowledge bases from the server
 - test the connection before starting sync
+- apply the configured chat, embedding, and multimodal models when a knowledge base is created or a sync starts
 - select completed conversion outputs to sync
 - monitor sync history, logs, progress, ETA, and pause/resume state
 

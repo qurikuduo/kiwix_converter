@@ -204,6 +204,9 @@ CREATE TABLE IF NOT EXISTS weknora_sync_log_entries (
                 case "weKnoraChatModelId":
                     settings.WeKnoraChatModelId = value;
                     break;
+                case "weKnoraEmbeddingModelId":
+                    settings.WeKnoraEmbeddingModelId = value;
+                    break;
                 case "weKnoraMultimodalModelId":
                     settings.WeKnoraMultimodalModelId = value;
                     break;
@@ -256,6 +259,7 @@ CREATE TABLE IF NOT EXISTS weknora_sync_log_entries (
         await UpsertSettingAsync(connection, transaction, "weKnoraKnowledgeBaseId", settings.WeKnoraKnowledgeBaseId, cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraKnowledgeBaseName", settings.WeKnoraKnowledgeBaseName, cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraChatModelId", settings.WeKnoraChatModelId, cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "weKnoraEmbeddingModelId", settings.WeKnoraEmbeddingModelId, cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraMultimodalModelId", settings.WeKnoraMultimodalModelId, cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraAuthMode", settings.WeKnoraAuthMode.ToString(), cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraAutoCreateKnowledgeBase", settings.WeKnoraAutoCreateKnowledgeBase.ToString(), cancellationToken);
