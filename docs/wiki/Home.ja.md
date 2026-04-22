@@ -63,6 +63,7 @@ Kiwix Converter は、kiwix-desktop の ZIM アーカイブを記事単位の Ma
 
 ## 追加ページ
 
+- [アーキテクチャ](Architecture)
 - [Release Process](Release-Process)
 - [发布流程（简体中文）](Release-Process.zh-CN)
 - [リリース手順（日本語）](Release-Process.ja)

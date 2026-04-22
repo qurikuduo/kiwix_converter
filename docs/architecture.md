@@ -24,6 +24,8 @@
 - `Services`
   - `LibraryScanner` for directory sync
   - `ConversionCoordinator` for task orchestration, checkpointing, snapshots, and export writing
+  - `WeKnoraClient` for HTTP access to knowledge bases, models, and manual knowledge endpoints
+  - `WeKnoraSyncCoordinator` for resumable sync task execution and per-article upload tracking
   - `KiwixAppService` as the UI-facing application service boundary
 
 ### `KiwixConverter.WinForms`
@@ -39,13 +41,16 @@
 
 ## Data Model
 
-The SQLite schema is centered on five persistent concepts:
+The SQLite schema is centered on conversion and sync state:
 
 - `settings`: configured directories and snapshot interval
 - `zim_library`: synced ZIM files discovered in the configured kiwix-desktop directory
 - `conversion_tasks`: one record per export run, including progress and pause state
 - `article_checkpoints`: per-article completion or skip state used for resume
 - `log_entries`: queryable operational logs
+- `weknora_sync_tasks`: one record per WeKnora upload run, including progress, pause state, and target KB
+- `weknora_sync_items`: per-article upload checkpoints used for resumable WeKnora sync
+- `weknora_sync_log_entries`: queryable sync-specific logs
 
 Archive metadata is stored separately per task and also emitted into `archive-metadata.json` for external inspection.
 
@@ -67,6 +72,14 @@ Archive metadata is stored separately per task and also emitted into `archive-me
 5. Periodically update the task heartbeat and `task-state.json` snapshot.
 6. Mark the task completed, paused, or faulted.
 
+## WeKnora Sync Pipeline
+
+1. Validate the saved base URL, auth mode, access token, and KB selection strategy.
+2. Load knowledge bases from the WeKnora API and optionally auto-create a KB when a configured name is missing.
+3. Load live `KnowledgeQA`, `Embedding`, and `VLLM` model IDs from `/api/v1/models` and apply them to KB initialization.
+4. Walk the completed Markdown exports and upload each article as manual knowledge.
+5. Persist per-article sync checkpoints, sync logs, and sync task heartbeat state so pause/resume works the same way as conversion.
+
 ## Why `zimdump` Subprocesses
 
 The design intentionally keeps raw archive parsing out of the C# process. `zimdump` is treated as the trusted archive reader because it is purpose-built for ZIM handling and simplifies the desktop application to orchestration, extraction cleanup, and export generation.
@@ -82,4 +95,4 @@ The design intentionally keeps raw archive parsing out of the C# process. `zimdu
 
 - `zimdump` output format can vary across versions, so the client uses multiple parsing strategies for article enumeration.
 - Some mathematical content arrives as MathML, some as plain Unicode, and some as images. The current implementation preserves text and normalizes MathML best-effort, but formula fidelity still depends on the source article markup.
-- The current workspace did not have a .NET SDK, so build/runtime verification must be completed on a machine with the SDK installed.
+- The current Windows environment now has the .NET 8 SDK installed, and both source builds and packaged EXE startup checks were revalidated locally.

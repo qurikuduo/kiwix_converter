@@ -63,6 +63,7 @@ The current desktop flow supports:
 
 ## Additional Pages
 
+- [Architecture](Architecture)
 - [Release Process](Release-Process)
 - [发布流程（简体中文）](Release-Process.zh-CN)
 - [リリース手順（日本語）](Release-Process.ja)
