@@ -9,7 +9,7 @@
 ## Flujo de GitHub Actions
 
 1. `ci.yml` se ejecuta en cada push a `main` y en cada pull request.
-2. `release.yml` se ejecuta con etiquetas semánticas o mediante `workflow_dispatch` con una versión explícita.
+2. `release.yml` se ejecuta en cada push a `main`, calcula automáticamente la siguiente versión patch semántica a partir de la última etiqueta de release y también puede ejecutarse mediante `workflow_dispatch` con una versión explícita.
 3. El flujo de release compila la aplicación WinForms, publica el paquete de Windows, genera checksums y crea una GitHub Release.
 
 ## Artefactos de release

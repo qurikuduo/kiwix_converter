@@ -13,6 +13,37 @@ Kiwix Converter transforma archivos ZIM de kiwix-desktop en Markdown por artícu
 - Persistencia: configuración, checkpoints, metadatos y logs almacenados en SQLite
 - Automatización: CI, empaquetado y publicación de releases con versiones semánticas
 
+## Inicio rápido
+
+Para usuarios no técnicos, la ruta más sencilla es:
+
+1. Descargar el último Windows release zip.
+2. Instalar .NET 8 Desktop Runtime.
+3. Instalar `zimdump` y añadirlo a `PATH`, o seleccionar `zimdump.exe` desde la aplicación.
+4. Abrir la aplicación, elegir el directorio de `kiwix-desktop` y la carpeta de salida, y luego escanear los archivos ZIM.
+
+Si vas a compilar desde el código fuente, instala .NET 8 SDK.
+
+## Comprobación de dependencias al iniciar
+
+La aplicación de escritorio ahora verifica `zimdump` al arrancar.
+
+- Si `zimdump` está disponible, la conversión queda lista.
+- Si falta, la app muestra una advertencia y permite buscar el ejecutable de inmediato.
+- La app puede seguir abierta sin `zimdump`, pero las funciones de exportación quedan bloqueadas hasta configurarlo.
+
+## Sincronización con WeKnora
+
+El primer destino integrado para RAG es WeKnora.
+
+El flujo actual de escritorio admite:
+
+- URL base y autenticación mediante `API Key` o `Bearer Token`
+- carga de bases de conocimiento desde el servidor de WeKnora
+- creación automática por nombre cuando está habilitada
+- selección de conversiones completadas para sincronizar
+- historial de sincronización, logs por tarea, progreso, ETA, pausa/reanudación y checkpoints reanudables
+
 ## Páginas por idioma
 
 - [Home](Home)
@@ -28,3 +59,9 @@ Kiwix Converter transforma archivos ZIM de kiwix-desktop en Markdown por artícu
 - [リリース手順（日本語）](Release-Process.ja)
 - [Proceso de release (Español)](Release-Process.es)
 - [عملية الإصدار (العربية)](Release-Process.ar)
+
+## Notas de instalación
+
+- `zimdump` proviene de las herramientas de Kiwix; no está incluido en este repositorio.
+- El release actual de Windows es framework-dependent, por lo que conviene instalar .NET 8 Desktop Runtime antes del primer arranque.
+- Para compilar localmente sigue siendo necesario .NET 8 SDK.

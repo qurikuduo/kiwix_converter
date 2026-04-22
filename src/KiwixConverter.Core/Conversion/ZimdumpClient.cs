@@ -8,7 +8,13 @@ public sealed class ZimdumpClient
 {
     public async Task<ZimArchiveMetadata> GetArchiveMetadataAsync(AppSettings settings, string zimPath, CancellationToken cancellationToken = default)
     {
-        var output = await ExecuteTextAsync(settings, ["-F", zimPath], cancellationToken);
+        var output = await ExecuteTextUsingStrategiesAsync(
+            settings,
+            [
+                ["info", zimPath],
+                ["-F", zimPath]
+            ],
+            cancellationToken);
         var metadata = ParseMetadata(output);
         return metadata;
     }
@@ -17,6 +23,7 @@ public sealed class ZimdumpClient
     {
         var strategies = new[]
         {
+            new[] { "list", "--details", "--ns=A", zimPath },
             new[] { "-l", "-n", "A", zimPath },
             new[] { "-L", "-n", "A", zimPath },
             new[] { "-i", "-n", "A", zimPath }
@@ -35,16 +42,17 @@ public sealed class ZimdumpClient
         throw new InvalidOperationException("No article entries could be enumerated from the ZIM archive using zimdump.");
     }
 
-    public async Task<string> GetArticleHtmlAsync(AppSettings settings, string zimPath, string articleUrl, CancellationToken cancellationToken = default)
+    public async Task<string> GetArticleHtmlAsync(AppSettings settings, string zimPath, ZimArticleDescriptor article, CancellationToken cancellationToken = default)
     {
         var lastException = default(Exception);
-        foreach (var candidate in BuildUrlCandidates(articleUrl))
+
+        if (article.Index.HasValue)
         {
             try
             {
-                var bytes = await ExecuteBytesAsync(settings, ["-u", candidate, "-d", zimPath], cancellationToken);
+                var bytes = await ExecuteBytesAsync(settings, ["show", $"--idx={article.Index.Value}", zimPath], cancellationToken);
                 var text = DecodeText(bytes).Trim();
-                if (!string.IsNullOrWhiteSpace(text))
+                if (LooksLikeHtml(text))
                 {
                     return text;
                 }
@@ -55,7 +63,27 @@ public sealed class ZimdumpClient
             }
         }
 
-        throw new InvalidOperationException($"Unable to extract article HTML for '{articleUrl}'.", lastException);
+        foreach (var candidate in BuildUrlCandidates(article.Url))
+        {
+            foreach (var arguments in BuildShowArguments(zimPath, candidate))
+            {
+                try
+                {
+                    var bytes = await ExecuteBytesAsync(settings, arguments, cancellationToken);
+                    var text = DecodeText(bytes).Trim();
+                    if (LooksLikeHtml(text))
+                    {
+                        return text;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    lastException = exception;
+                }
+            }
+        }
+
+        throw new InvalidOperationException($"Unable to extract article HTML for '{article.Url}'.", lastException);
     }
 
     public async Task<byte[]> GetBinaryContentAsync(AppSettings settings, string zimPath, string entryUrl, CancellationToken cancellationToken = default)
@@ -63,17 +91,20 @@ public sealed class ZimdumpClient
         var lastException = default(Exception);
         foreach (var candidate in BuildUrlCandidates(entryUrl))
         {
-            try
+            foreach (var arguments in BuildShowArguments(zimPath, candidate))
             {
-                var bytes = await ExecuteBytesAsync(settings, ["-u", candidate, "-d", zimPath], cancellationToken);
-                if (bytes.Length > 0)
+                try
                 {
-                    return bytes;
+                    var bytes = await ExecuteBytesAsync(settings, arguments, cancellationToken);
+                    if (bytes.Length > 0)
+                    {
+                        return bytes;
+                    }
                 }
-            }
-            catch (Exception exception)
-            {
-                lastException = exception;
+                catch (Exception exception)
+                {
+                    lastException = exception;
+                }
             }
         }
 
@@ -82,7 +113,13 @@ public sealed class ZimdumpClient
 
     public async Task<string> GetVersionAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
-        return (await ExecuteTextAsync(settings, ["-V"], cancellationToken)).Trim();
+        return (await ExecuteTextUsingStrategiesAsync(
+            settings,
+            [
+                ["--version"],
+                ["-V"]
+            ],
+            cancellationToken)).Trim();
     }
 
     private static IEnumerable<string> BuildUrlCandidates(string url)
@@ -139,13 +176,19 @@ public sealed class ZimdumpClient
             Language = FindFirstValue(rawFields, "language", "lang"),
             Publisher = FindFirstValue(rawFields, "publisher", "creator", "author"),
             ArchiveDate = FindFirstValue(rawFields, "date", "creation date", "build date"),
-            ArticleCount = FindIntValue(rawFields, "article count", "articles", "entry count"),
+            ArticleCount = FindIntValue(rawFields, "article count", "articles", "entry count", "count-entries"),
             RawMetadata = rawFields
         };
     }
 
     private static IReadOnlyList<ZimArticleDescriptor> ParseArticleListing(string output)
     {
+        var modernResults = ParseModernArticleListing(output);
+        if (modernResults.Count > 0)
+        {
+            return modernResults;
+        }
+
         var results = new List<ZimArticleDescriptor>();
 
         foreach (var line in SplitLines(output))
@@ -176,6 +219,55 @@ public sealed class ZimdumpClient
             .GroupBy(static article => article.Url, StringComparer.OrdinalIgnoreCase)
             .Select(static group => group.First())
             .ToList();
+    }
+
+    private static IReadOnlyList<ZimArticleDescriptor> ParseModernArticleListing(string output)
+    {
+        var results = new List<ZimArticleDescriptor>();
+        string? currentPath = null;
+        string? currentTitle = null;
+        string? currentType = null;
+        string? currentMimeType = null;
+        int? currentIndex = null;
+
+        foreach (var line in SplitLines(output))
+        {
+            if (line.StartsWith("path:", StringComparison.OrdinalIgnoreCase))
+            {
+                FlushCurrentModernEntry(results, currentPath, currentTitle, currentType, currentMimeType, currentIndex);
+                currentPath = line[5..].Trim();
+                currentTitle = null;
+                currentType = null;
+                currentMimeType = null;
+                currentIndex = null;
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(currentPath))
+            {
+                continue;
+            }
+
+            if (line.StartsWith("* title:", StringComparison.OrdinalIgnoreCase))
+            {
+                currentTitle = line[(line.IndexOf(':') + 1)..].Trim();
+            }
+            else if (line.StartsWith("* idx:", StringComparison.OrdinalIgnoreCase))
+            {
+                currentIndex = TryParseTrailingInteger(line);
+            }
+            else if (line.StartsWith("* type:", StringComparison.OrdinalIgnoreCase))
+            {
+                currentType = line[(line.IndexOf(':') + 1)..].Trim();
+            }
+            else if (line.StartsWith("* mime-type:", StringComparison.OrdinalIgnoreCase))
+            {
+                currentMimeType = line[(line.IndexOf(':') + 1)..].Trim();
+            }
+        }
+
+        FlushCurrentModernEntry(results, currentPath, currentTitle, currentType, currentMimeType, currentIndex);
+        return results;
     }
 
     private static ZimArticleDescriptor? TryParseArticleDescriptor(string line)
@@ -272,6 +364,17 @@ public sealed class ZimdumpClient
         return int.TryParse(digits, out var parsed) ? parsed : null;
     }
 
+    private static int? TryParseTrailingInteger(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var digits = new string(value.Where(char.IsDigit).ToArray());
+        return int.TryParse(digits, out var parsed) ? parsed : null;
+    }
+
     private static IEnumerable<string> SplitLines(string text)
     {
         return text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -301,6 +404,24 @@ public sealed class ZimdumpClient
     {
         var bytes = await ExecuteBytesAsync(settings, arguments, cancellationToken);
         return DecodeText(bytes);
+    }
+
+    private static async Task<string> ExecuteTextUsingStrategiesAsync(AppSettings settings, IReadOnlyList<string>[] argumentSets, CancellationToken cancellationToken)
+    {
+        Exception? lastException = null;
+        foreach (var arguments in argumentSets)
+        {
+            try
+            {
+                return await ExecuteTextAsync(settings, arguments, cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                lastException = exception;
+            }
+        }
+
+        throw new InvalidOperationException("All zimdump command strategies failed.", lastException);
     }
 
     private static async Task<byte[]> ExecuteBytesAsync(AppSettings settings, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
@@ -380,5 +501,42 @@ public sealed class ZimdumpClient
 
         var utf8 = Encoding.UTF8.GetString(bytes);
         return utf8.Contains('\0') ? Encoding.Unicode.GetString(bytes) : utf8;
+    }
+
+    private static void FlushCurrentModernEntry(
+        List<ZimArticleDescriptor> results,
+        string? path,
+        string? title,
+        string? type,
+        string? mimeType,
+        int? index)
+    {
+        if (string.IsNullOrWhiteSpace(path)
+            || !string.Equals(type, "item", StringComparison.OrdinalIgnoreCase)
+            || (!string.IsNullOrWhiteSpace(mimeType) && !mimeType.Contains("html", StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        results.Add(CreateDescriptor(path, string.IsNullOrWhiteSpace(title) ? path : title, index));
+    }
+
+    private static bool LooksLikeHtml(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        var trimmed = text.TrimStart();
+        return trimmed.StartsWith("<!DOCTYPE html", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("<html", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("<body", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IEnumerable<IReadOnlyList<string>> BuildShowArguments(string zimPath, string candidate)
+    {
+        yield return ["show", $"--url={candidate}", zimPath];
+        yield return ["-u", candidate, "-d", zimPath];
     }
 }

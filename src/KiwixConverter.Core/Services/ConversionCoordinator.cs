@@ -262,7 +262,7 @@ public sealed class ConversionCoordinator
         ZimArticleDescriptor article,
         CancellationToken cancellationToken)
     {
-        var html = await _zimdumpClient.GetArticleHtmlAsync(settings, task.ZimPath, article.Url, cancellationToken);
+        var html = await _zimdumpClient.GetArticleHtmlAsync(settings, task.ZimPath, article, cancellationToken);
         Exception? lastException = null;
 
         foreach (var usePreparedContent in new[] { true, false })

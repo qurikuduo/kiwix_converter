@@ -26,6 +26,12 @@ public enum LogSeverity
     Error
 }
 
+public enum WeKnoraAuthMode
+{
+    ApiKey,
+    BearerToken
+}
+
 public sealed class AppSettings
 {
     public string? KiwixDesktopDirectory { get; set; }
@@ -35,6 +41,35 @@ public sealed class AppSettings
     public string? ZimdumpExecutablePath { get; set; }
 
     public int SnapshotIntervalSeconds { get; set; } = 15;
+
+    public string? WeKnoraBaseUrl { get; set; }
+
+    public string? WeKnoraAccessToken { get; set; }
+
+    public string? WeKnoraKnowledgeBaseId { get; set; }
+
+    public string? WeKnoraKnowledgeBaseName { get; set; }
+
+    public string? WeKnoraChatModelId { get; set; }
+
+    public string? WeKnoraMultimodalModelId { get; set; }
+
+    public WeKnoraAuthMode WeKnoraAuthMode { get; set; } = WeKnoraAuthMode.ApiKey;
+
+    public bool WeKnoraAutoCreateKnowledgeBase { get; set; } = true;
+
+    public bool WeKnoraAppendMetadataBlock { get; set; } = true;
+}
+
+public sealed class ToolAvailabilityResult
+{
+    public bool IsAvailable { get; set; }
+
+    public string? ResolvedPath { get; set; }
+
+    public string? Version { get; set; }
+
+    public string? Message { get; set; }
 }
 
 public sealed class ZimLibraryItem
@@ -133,6 +168,129 @@ public sealed class LogEntryRecord
     public long Id { get; set; }
 
     public long? TaskId { get; set; }
+
+    public DateTime TimestampUtc { get; set; }
+
+    public LogSeverity Level { get; set; }
+
+    public string Category { get; set; } = string.Empty;
+
+    public string Message { get; set; } = string.Empty;
+
+    public string? Details { get; set; }
+
+    public string? ArticleUrl { get; set; }
+
+    public string? Exception { get; set; }
+}
+
+public sealed class WeKnoraKnowledgeBaseInfo
+{
+    public string Id { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+
+    public string? Description { get; set; }
+
+    public string Type { get; set; } = "document";
+
+    public bool IsTemporary { get; set; }
+
+    public string? StorageProvider { get; set; }
+}
+
+public sealed class WeKnoraKnowledgeItemInfo
+{
+    public string Id { get; set; } = string.Empty;
+
+    public string KnowledgeBaseId { get; set; } = string.Empty;
+
+    public string Type { get; set; } = string.Empty;
+
+    public string? Title { get; set; }
+
+    public string? ParseStatus { get; set; }
+
+    public string? EnableStatus { get; set; }
+
+    public string? ErrorMessage { get; set; }
+}
+
+public sealed class WeKnoraSyncTaskRecord
+{
+    public long Id { get; set; }
+
+    public long SourceTaskId { get; set; }
+
+    public string SourceArchiveKey { get; set; } = string.Empty;
+
+    public string SourceOutputDirectory { get; set; } = string.Empty;
+
+    public string BaseUrl { get; set; } = string.Empty;
+
+    public string AuthMode { get; set; } = WeKnoraAuthMode.ApiKey.ToString();
+
+    public string KnowledgeBaseId { get; set; } = string.Empty;
+
+    public string? KnowledgeBaseName { get; set; }
+
+    public ConversionTaskStatus Status { get; set; }
+
+    public DateTime CreatedUtc { get; set; }
+
+    public DateTime? StartedUtc { get; set; }
+
+    public DateTime? CompletedUtc { get; set; }
+
+    public DateTime? LastHeartbeatUtc { get; set; }
+
+    public bool RequestedPause { get; set; }
+
+    public int ProcessedDocuments { get; set; }
+
+    public int TotalDocuments { get; set; }
+
+    public int FailedDocuments { get; set; }
+
+    public string? CurrentArticleUrl { get; set; }
+
+    public int? CurrentArticleIndex { get; set; }
+
+    public string? ErrorMessage { get; set; }
+}
+
+public sealed class WeKnoraSyncItemRecord
+{
+    public long Id { get; set; }
+
+    public long SyncTaskId { get; set; }
+
+    public string ArticleUrl { get; set; } = string.Empty;
+
+    public string? ArticleTitle { get; set; }
+
+    public string? OutputRelativePath { get; set; }
+
+    public ArticleStatus Status { get; set; }
+
+    public int AttemptCount { get; set; }
+
+    public string? ContentHash { get; set; }
+
+    public string? RemoteKnowledgeId { get; set; }
+
+    public string? RemoteParseStatus { get; set; }
+
+    public string? LastError { get; set; }
+
+    public DateTime? LastProcessedUtc { get; set; }
+}
+
+public sealed class WeKnoraSyncLogEntryRecord
+{
+    public long Id { get; set; }
+
+    public long? SyncTaskId { get; set; }
 
     public DateTime TimestampUtc { get; set; }
 

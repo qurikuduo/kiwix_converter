@@ -9,7 +9,7 @@
 ## GitHub Actions 流程
 
 1. `ci.yml` 在 `main` 分支 push 和 pull request 时运行。
-2. `release.yml` 在语义化版本标签或手动传入版本号时运行。
+2. `release.yml` 会在每次 push 到 `main` 时运行，基于最新 release tag 自动计算下一个语义化 patch 版本；同时仍支持通过 `workflow_dispatch` 手动覆盖版本号。
 3. release 工作流会构建 WinForms 应用、发布 Windows 包、生成校验和并创建 GitHub Release。
 
 ## 发布资产

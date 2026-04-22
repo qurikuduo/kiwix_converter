@@ -21,8 +21,66 @@ Kiwix Converter 是一个基于 WinForms + SQLite 的桌面工具，用于把 ki
 ## 运行要求
 
 - Windows
-- .NET 8 SDK
+- 运行打包后的桌面程序时需要 .NET 8 Desktop Runtime
+- 如果你要从源码编译，则需要 .NET 8 SDK
 - `zimdump` 已安装，并且在 `PATH` 中或可在界面里手动指定路径
+
+## 面向普通用户的快速开始
+
+如果你只是想直接使用程序，优先下载 GitHub Release 里的 Windows zip 包，并安装 .NET 8 Desktop Runtime。只有在你准备自己打开解决方案、编译源码时，才需要安装完整的 .NET 8 SDK。
+
+### 1. 安装 .NET
+
+- 直接运行发布包：安装 Windows x64 版 .NET 8 Desktop Runtime。
+- 从源码编译：安装 .NET 8 SDK。
+- 安装完成后，重新打开终端或重新登录系统，确保 `dotnet` 命令已经进入 `PATH`。
+
+### 2. 安装 `zimdump`
+
+Kiwix Converter 本身不直接读取 ZIM 文件，而是调用 Kiwix 工具链里的 `zimdump`。
+
+Windows 上的常见配置方式：
+
+1. 下载包含 `zimdump.exe` 的 Kiwix tools 压缩包。
+2. 解压到固定目录，例如 `C:\Kiwix\tools\`。
+3. 选择下面两种方式之一：
+  - 把该目录加入 Windows 的 `PATH`
+  - 不改 `PATH`，在程序首次启动时手动选择 `zimdump.exe`
+
+Windows 设置 `PATH` 的步骤：
+
+1. 打开“系统属性”。
+2. 进入“环境变量”。
+3. 编辑用户或系统级的 `Path` 变量。
+4. 新增 `zimdump.exe` 所在目录。
+5. 关闭并重新打开程序。
+
+### 3. 程序首次启动会检查什么
+
+程序启动时会自动检查 `zimdump` 是否可用。
+
+- 如果找到 `zimdump`，程序正常进入主界面。
+- 如果没有找到，程序会弹出提示，并允许你立刻浏览并选择 `zimdump.exe`。
+- 即使暂时跳过，程序也可以保持打开，但转换和元数据提取功能会一直不可用，直到你把依赖配置好。
+
+### 4. 如何配置 WeKnora 同步
+
+程序里新增了 `WeKnora Sync Configuration` 区域，作为第一阶段的 RAG 同步目标。
+
+你需要填写或选择：
+
+- WeKnora 基础地址
+- 认证方式：`API Key` 或 `Bearer Token`
+- 访问令牌
+- 知识库 ID 或知识库名称
+- 当知识库名称不存在时，是否允许程序自动创建知识库
+
+新的同步界面支持：
+
+- 从服务器读取知识库列表
+- 先测试连接，再启动同步
+- 选择哪些已完成转换的档案要同步到 WeKnora
+- 查看同步历史、实时状态、进度条、ETA、日志以及暂停/恢复状态
 
 ## 项目结构
 
@@ -38,19 +96,24 @@ docs/
 
 ## 使用流程
 
-1. 启动程序。
-2. 首次运行时设置：
+1. 如果你运行的是发布包，请先安装 .NET 8 Desktop Runtime；如果你是从源码运行，请先安装 .NET 8 SDK。
+2. 确保 `zimdump` 已安装。
+3. 启动程序。
+4. 首次运行时设置：
    - `kiwix-desktop` 目录
    - 默认输出目录
    - 可选的 `zimdump` 可执行文件路径
-3. 点击 `Scan ZIM Files` 扫描本地档案。
-4. 在下载列表中选择 ZIM，必要时填写单任务输出覆盖目录。
-5. 启动转换任务，并在任务页查看进度、暂停/恢复状态和日志。
+5. 如果启动检查提示 `zimdump` 缺失，先修复 `PATH` 或手动选择 `zimdump.exe`。
+6. 点击 `Scan ZIM Files` 扫描本地档案。
+7. 在下载列表中选择 ZIM，必要时填写单任务输出覆盖目录。
+8. 启动转换任务，并在任务页查看进度、暂停/恢复状态和日志。
+9. 若要同步到 WeKnora，打开 `WeKnora Sync` 页，选择一个或多个已完成转换的档案并启动同步任务。
 
 ## 自动化构建与发布
 
 - [`.github/workflows/ci.yml`](.github/workflows/ci.yml) 会在 `main` 分支 push 和 PR 时自动编译并上传 Windows 构建产物。
-- [`.github/workflows/release.yml`](.github/workflows/release.yml) 会在语义化版本发布时自动打包并创建 GitHub Release。
+- [`.github/workflows/release.yml`](.github/workflows/release.yml) 现在会在每次 push 到 `main` 时，基于最新的语义化版本标签自动计算下一个 patch 版本并创建新的 GitHub Release。
+- 同一个 release workflow 仍然支持手动 `workflow_dispatch`，可在需要时覆盖版本号。
 - [`.github/release.yml`](.github/release.yml) 定义自动生成的 release note 模板与分类。
 
 ## Wiki 源文档

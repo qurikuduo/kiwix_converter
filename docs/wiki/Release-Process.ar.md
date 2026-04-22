@@ -9,7 +9,7 @@
 ## مسار GitHub Actions
 
 1. يتم تشغيل `ci.yml` عند كل push إلى `main` وعند كل pull request.
-2. يتم تشغيل `release.yml` عند استخدام وسوم semantic versioning أو عبر `workflow_dispatch` مع إدخال نسخة محددة.
+2. يتم تشغيل `release.yml` الآن عند كل push إلى `main`، ويحسب تلقائياً رقم patch التالي اعتماداً على أحدث وسم release، كما يمكن تشغيله أيضاً عبر `workflow_dispatch` مع إدخال نسخة محددة يدوياً.
 3. يقوم مسار الإصدار ببناء تطبيق WinForms، ونشر حزمة Windows، وإنشاء checksum، ثم إنشاء GitHub Release.
 
 ## ملفات الإصدار

@@ -21,24 +21,79 @@ Kiwix Converter は、kiwix-desktop でダウンロードした ZIM アーカイ
 ## 実行要件
 
 - Windows
-- .NET 8 SDK
+- パッケージ版アプリを実行する場合は .NET 8 Desktop Runtime
+- ソースからビルドする場合は .NET 8 SDK
 - `zimdump` が `PATH` にある、またはアプリからパス指定できること
+
+## 初心者向けクイックスタート
+
+アプリを使うだけなら、GitHub Release の Windows zip をダウンロードし、.NET 8 Desktop Runtime をインストールするのが最も簡単です。Visual Studio で開いたり、`dotnet build` で自分でビルドしたりする場合だけ .NET 8 SDK が必要です。
+
+### 1. .NET のインストール
+
+- パッケージ版アプリを実行するだけなら Windows x64 用の .NET 8 Desktop Runtime をインストールします。
+- ソースからビルドするなら .NET 8 SDK をインストールします。
+- インストール後は、ターミナルやアプリを再起動して `dotnet` が `PATH` で見えることを確認してください。
+
+### 2. `zimdump` のインストール
+
+Kiwix Converter は ZIM を直接読まず、Kiwix ツール群の `zimdump` を呼び出します。
+
+Windows での一般的な手順:
+
+1. `zimdump.exe` を含む Kiwix tools パッケージをダウンロードします。
+2. `C:\Kiwix\tools\` のような固定フォルダーに展開します。
+3. 次のどちらかを行います。
+   - そのフォルダーを Windows の `PATH` に追加する
+   - `PATH` は変更せず、初回起動時に `zimdump.exe` を手動で選択する
+
+### 3. 起動時の依存関係チェック
+
+アプリは起動時に `zimdump` の有無を自動確認します。
+
+- `zimdump` が見つかれば、そのまま変換できます。
+- 見つからない場合は警告を表示し、すぐに `zimdump.exe` を参照できます。
+- 依存関係が未設定でもアプリ自体は開いたままにできますが、変換とメタデータ抽出は利用できません。
+
+### 4. WeKnora 同期の設定
+
+最初の組み込み RAG 同期先は WeKnora です。
+
+`WeKnora Sync Configuration` で次を設定します。
+
+- WeKnora のベース URL
+- 認証方式: `API Key` または `Bearer Token`
+- アクセストークン
+- ナレッジベース ID またはナレッジベース名
+- 指定名が存在しない場合にナレッジベースを自動作成するかどうか
+
+同期 UI では以下を行えます。
+
+- サーバーからナレッジベース一覧を読み込む
+- 同期前に接続テストを行う
+- 完了済みの変換出力を選択して同期する
+- 同期履歴、ログ、進捗、ETA、停止/再開状態を監視する
 
 ## 使い方
 
-1. アプリを起動します。
-2. 初回起動時に以下を設定します。
+1. パッケージ版を使う場合は .NET 8 Desktop Runtime を、ソースから実行する場合は .NET 8 SDK をインストールします。
+2. `zimdump` をインストールします。
+3. アプリを起動します。
+4. 初回起動時に以下を設定します。
    - `kiwix-desktop` ディレクトリ
    - 既定の出力ディレクトリ
    - 必要に応じて `zimdump` 実行ファイルのパス
-3. `Scan ZIM Files` を実行してローカルの ZIM を同期します。
-4. ダウンロード一覧から ZIM を選び、必要ならタスクごとの出力先を上書きします。
-5. 変換を開始し、タスク画面で進捗、停止/再開、ログを確認します。
+5. 起動チェックで `zimdump` が見つからない場合は、`zimdump.exe` を指定するか `PATH` を修正します。
+6. `Scan ZIM Files` を実行してローカルの ZIM を同期します。
+7. ダウンロード一覧から ZIM を選び、必要ならタスクごとの出力先を上書きします。
+8. 変換を開始し、タスク画面で進捗、停止/再開、ログを確認します。
+9. WeKnora に送る場合は `WeKnora Sync` を開き、完了済みの変換出力を選んで同期タスクを開始します。
 
 ## CI / Release 自動化
 
 - [`.github/workflows/ci.yml`](.github/workflows/ci.yml) は `main` への push と PR で自動ビルドを実行します。
-- [`.github/workflows/release.yml`](.github/workflows/release.yml) はセマンティックバージョンに基づくリリースを自動作成します。
+- [`.github/workflows/release.yml`](.github/workflows/release.yml) は `main` への各 push ごとに、最新タグを基準に次の patch バージョンを自動計算して GitHub Release を公開します。
+- 同じ release workflow は `workflow_dispatch` にも対応しており、必要な場合はバージョン番号を手動で上書きできます。
 - [`.github/release.yml`](.github/release.yml) はリリースノートの自動生成フォーマットを定義します。
 
 ## Wiki ソース

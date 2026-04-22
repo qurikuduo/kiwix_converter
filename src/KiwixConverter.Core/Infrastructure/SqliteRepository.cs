@@ -98,6 +98,60 @@ CREATE TABLE IF NOT EXISTS log_entries (
     exception TEXT NULL,
     FOREIGN KEY (task_id) REFERENCES conversion_tasks(id)
 );
+
+CREATE TABLE IF NOT EXISTS weknora_sync_tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_task_id INTEGER NOT NULL,
+    source_archive_key TEXT NOT NULL,
+    source_output_directory TEXT NOT NULL,
+    base_url TEXT NOT NULL,
+    auth_mode TEXT NOT NULL,
+    knowledge_base_id TEXT NOT NULL,
+    knowledge_base_name TEXT NULL,
+    status TEXT NOT NULL,
+    created_utc TEXT NOT NULL,
+    started_utc TEXT NULL,
+    completed_utc TEXT NULL,
+    last_heartbeat_utc TEXT NULL,
+    requested_pause INTEGER NOT NULL DEFAULT 0,
+    processed_documents INTEGER NOT NULL DEFAULT 0,
+    total_documents INTEGER NOT NULL DEFAULT 0,
+    failed_documents INTEGER NOT NULL DEFAULT 0,
+    current_article_url TEXT NULL,
+    current_article_index INTEGER NULL,
+    error_message TEXT NULL,
+    FOREIGN KEY (source_task_id) REFERENCES conversion_tasks(id)
+);
+
+CREATE TABLE IF NOT EXISTS weknora_sync_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sync_task_id INTEGER NOT NULL,
+    article_url TEXT NOT NULL,
+    article_title TEXT NULL,
+    output_relative_path TEXT NULL,
+    status TEXT NOT NULL,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    content_hash TEXT NULL,
+    remote_knowledge_id TEXT NULL,
+    remote_parse_status TEXT NULL,
+    last_error TEXT NULL,
+    last_processed_utc TEXT NULL,
+    UNIQUE (sync_task_id, article_url),
+    FOREIGN KEY (sync_task_id) REFERENCES weknora_sync_tasks(id)
+);
+
+CREATE TABLE IF NOT EXISTS weknora_sync_log_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sync_task_id INTEGER NULL,
+    timestamp_utc TEXT NOT NULL,
+    level TEXT NOT NULL,
+    category TEXT NOT NULL,
+    message TEXT NOT NULL,
+    details TEXT NULL,
+    article_url TEXT NULL,
+    exception TEXT NULL,
+    FOREIGN KEY (sync_task_id) REFERENCES weknora_sync_tasks(id)
+);
 ";
 
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -135,6 +189,53 @@ CREATE TABLE IF NOT EXISTS log_entries (
                     }
 
                     break;
+                case "weKnoraBaseUrl":
+                    settings.WeKnoraBaseUrl = value;
+                    break;
+                case "weKnoraAccessToken":
+                    settings.WeKnoraAccessToken = value;
+                    break;
+                case "weKnoraKnowledgeBaseId":
+                    settings.WeKnoraKnowledgeBaseId = value;
+                    break;
+                case "weKnoraKnowledgeBaseName":
+                    settings.WeKnoraKnowledgeBaseName = value;
+                    break;
+                case "weKnoraChatModelId":
+                    settings.WeKnoraChatModelId = value;
+                    break;
+                case "weKnoraMultimodalModelId":
+                    settings.WeKnoraMultimodalModelId = value;
+                    break;
+                case "weKnoraAuthMode":
+                    if (Enum.TryParse<WeKnoraAuthMode>(value, out var authMode))
+                    {
+                        settings.WeKnoraAuthMode = authMode;
+                    }
+
+                    break;
+                case "weKnoraAutoCreateKnowledgeBase":
+                    if (bool.TryParse(value, out var autoCreateKnowledgeBase))
+                    {
+                        settings.WeKnoraAutoCreateKnowledgeBase = autoCreateKnowledgeBase;
+                    }
+                    else if (int.TryParse(value, out var autoCreateKnowledgeBaseInt))
+                    {
+                        settings.WeKnoraAutoCreateKnowledgeBase = autoCreateKnowledgeBaseInt != 0;
+                    }
+
+                    break;
+                case "weKnoraAppendMetadataBlock":
+                    if (bool.TryParse(value, out var appendMetadataBlock))
+                    {
+                        settings.WeKnoraAppendMetadataBlock = appendMetadataBlock;
+                    }
+                    else if (int.TryParse(value, out var appendMetadataBlockInt))
+                    {
+                        settings.WeKnoraAppendMetadataBlock = appendMetadataBlockInt != 0;
+                    }
+
+                    break;
             }
         }
 
@@ -150,6 +251,15 @@ CREATE TABLE IF NOT EXISTS log_entries (
         await UpsertSettingAsync(connection, transaction, "defaultOutputDirectory", settings.DefaultOutputDirectory, cancellationToken);
         await UpsertSettingAsync(connection, transaction, "zimdumpExecutablePath", settings.ZimdumpExecutablePath, cancellationToken);
         await UpsertSettingAsync(connection, transaction, "snapshotIntervalSeconds", settings.SnapshotIntervalSeconds.ToString(CultureInfo.InvariantCulture), cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "weKnoraBaseUrl", settings.WeKnoraBaseUrl, cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "weKnoraAccessToken", settings.WeKnoraAccessToken, cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "weKnoraKnowledgeBaseId", settings.WeKnoraKnowledgeBaseId, cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "weKnoraKnowledgeBaseName", settings.WeKnoraKnowledgeBaseName, cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "weKnoraChatModelId", settings.WeKnoraChatModelId, cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "weKnoraMultimodalModelId", settings.WeKnoraMultimodalModelId, cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "weKnoraAuthMode", settings.WeKnoraAuthMode.ToString(), cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "weKnoraAutoCreateKnowledgeBase", settings.WeKnoraAutoCreateKnowledgeBase.ToString(), cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "weKnoraAppendMetadataBlock", settings.WeKnoraAppendMetadataBlock.ToString(), cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
     }
@@ -537,6 +647,445 @@ WHERE status = 'Running';";
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task<long> CreateWeKnoraSyncTaskAsync(
+        long sourceTaskId,
+        string sourceArchiveKey,
+        string sourceOutputDirectory,
+        string baseUrl,
+        WeKnoraAuthMode authMode,
+        string knowledgeBaseId,
+        string? knowledgeBaseName,
+        CancellationToken cancellationToken = default)
+    {
+        var createdUtc = DateTime.UtcNow;
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = @"
+INSERT INTO weknora_sync_tasks(
+    source_task_id,
+    source_archive_key,
+    source_output_directory,
+    base_url,
+    auth_mode,
+    knowledge_base_id,
+    knowledge_base_name,
+    status,
+    created_utc,
+    last_heartbeat_utc,
+    requested_pause)
+VALUES(
+    $sourceTaskId,
+    $sourceArchiveKey,
+    $sourceOutputDirectory,
+    $baseUrl,
+    $authMode,
+    $knowledgeBaseId,
+    $knowledgeBaseName,
+    $status,
+    $createdUtc,
+    $lastHeartbeatUtc,
+    0);
+SELECT last_insert_rowid();";
+
+        command.Parameters.AddWithValue("$sourceTaskId", sourceTaskId);
+        command.Parameters.AddWithValue("$sourceArchiveKey", sourceArchiveKey);
+        command.Parameters.AddWithValue("$sourceOutputDirectory", sourceOutputDirectory);
+        command.Parameters.AddWithValue("$baseUrl", baseUrl);
+        command.Parameters.AddWithValue("$authMode", authMode.ToString());
+        command.Parameters.AddWithValue("$knowledgeBaseId", knowledgeBaseId);
+        command.Parameters.AddWithValue("$knowledgeBaseName", (object?)knowledgeBaseName ?? DBNull.Value);
+        command.Parameters.AddWithValue("$status", ConversionTaskStatus.Pending.ToString());
+        command.Parameters.AddWithValue("$createdUtc", createdUtc.ToString(Iso8601Format, CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$lastHeartbeatUtc", createdUtc.ToString(Iso8601Format, CultureInfo.InvariantCulture));
+
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        return Convert.ToInt64(result, CultureInfo.InvariantCulture);
+    }
+
+    public async Task<WeKnoraSyncTaskRecord?> GetWeKnoraSyncTaskAsync(long syncTaskId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = @"
+SELECT id,
+       source_task_id,
+       source_archive_key,
+       source_output_directory,
+       base_url,
+       auth_mode,
+       knowledge_base_id,
+       knowledge_base_name,
+       status,
+       created_utc,
+       started_utc,
+       completed_utc,
+       last_heartbeat_utc,
+       requested_pause,
+       processed_documents,
+       total_documents,
+       failed_documents,
+       current_article_url,
+       current_article_index,
+       error_message
+FROM weknora_sync_tasks
+WHERE id = $syncTaskId
+LIMIT 1;";
+        command.Parameters.AddWithValue("$syncTaskId", syncTaskId);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (await reader.ReadAsync(cancellationToken))
+        {
+            return ReadWeKnoraSyncTask(reader);
+        }
+
+        return null;
+    }
+
+    public async Task<WeKnoraSyncTaskRecord?> GetLatestWeKnoraSyncTaskForSourceAsync(
+        long sourceTaskId,
+        string knowledgeBaseId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = @"
+SELECT id,
+       source_task_id,
+       source_archive_key,
+       source_output_directory,
+       base_url,
+       auth_mode,
+       knowledge_base_id,
+       knowledge_base_name,
+       status,
+       created_utc,
+       started_utc,
+       completed_utc,
+       last_heartbeat_utc,
+       requested_pause,
+       processed_documents,
+       total_documents,
+       failed_documents,
+       current_article_url,
+       current_article_index,
+       error_message
+FROM weknora_sync_tasks
+WHERE source_task_id = $sourceTaskId
+  AND knowledge_base_id = $knowledgeBaseId
+ORDER BY created_utc DESC
+LIMIT 1;";
+        command.Parameters.AddWithValue("$sourceTaskId", sourceTaskId);
+        command.Parameters.AddWithValue("$knowledgeBaseId", knowledgeBaseId);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (await reader.ReadAsync(cancellationToken))
+        {
+            return ReadWeKnoraSyncTask(reader);
+        }
+
+        return null;
+    }
+
+    public async Task<IReadOnlyList<WeKnoraSyncTaskRecord>> GetWeKnoraSyncTasksAsync(string? searchText = null, CancellationToken cancellationToken = default)
+    {
+        var tasks = new List<WeKnoraSyncTaskRecord>();
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = @"
+SELECT id,
+       source_task_id,
+       source_archive_key,
+       source_output_directory,
+       base_url,
+       auth_mode,
+       knowledge_base_id,
+       knowledge_base_name,
+       status,
+       created_utc,
+       started_utc,
+       completed_utc,
+       last_heartbeat_utc,
+       requested_pause,
+       processed_documents,
+       total_documents,
+       failed_documents,
+       current_article_url,
+       current_article_index,
+       error_message
+FROM weknora_sync_tasks
+WHERE ($searchText IS NULL
+    OR source_archive_key LIKE '%' || $searchText || '%'
+    OR source_output_directory LIKE '%' || $searchText || '%'
+    OR knowledge_base_id LIKE '%' || $searchText || '%'
+    OR IFNULL(knowledge_base_name, '') LIKE '%' || $searchText || '%'
+    OR status LIKE '%' || $searchText || '%'
+    OR IFNULL(error_message, '') LIKE '%' || $searchText || '%')
+ORDER BY created_utc DESC;";
+        command.Parameters.AddWithValue("$searchText", (object?)searchText ?? DBNull.Value);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            tasks.Add(ReadWeKnoraSyncTask(reader));
+        }
+
+        return tasks;
+    }
+
+    public async Task SetWeKnoraSyncPauseRequestedAsync(long syncTaskId, bool requested, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = @"
+UPDATE weknora_sync_tasks
+SET requested_pause = $requestedPause,
+    last_heartbeat_utc = $lastHeartbeatUtc
+WHERE id = $syncTaskId;";
+        command.Parameters.AddWithValue("$syncTaskId", syncTaskId);
+        command.Parameters.AddWithValue("$requestedPause", requested ? 1 : 0);
+        command.Parameters.AddWithValue("$lastHeartbeatUtc", DateTime.UtcNow.ToString(Iso8601Format, CultureInfo.InvariantCulture));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task UpdateWeKnoraSyncTaskStatusAsync(
+        long syncTaskId,
+        ConversionTaskStatus status,
+        string? errorMessage = null,
+        DateTime? startedUtc = null,
+        DateTime? completedUtc = null,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = @"
+UPDATE weknora_sync_tasks
+SET status = $status,
+    started_utc = COALESCE($startedUtc, started_utc),
+    completed_utc = $completedUtc,
+    last_heartbeat_utc = $lastHeartbeatUtc,
+    error_message = $errorMessage,
+    requested_pause = CASE WHEN $status = 'Running' THEN 0 ELSE requested_pause END
+WHERE id = $syncTaskId;";
+        command.Parameters.AddWithValue("$syncTaskId", syncTaskId);
+        command.Parameters.AddWithValue("$status", status.ToString());
+        command.Parameters.AddWithValue("$startedUtc", startedUtc.HasValue ? startedUtc.Value.ToString(Iso8601Format, CultureInfo.InvariantCulture) : DBNull.Value);
+        command.Parameters.AddWithValue("$completedUtc", completedUtc.HasValue ? completedUtc.Value.ToString(Iso8601Format, CultureInfo.InvariantCulture) : DBNull.Value);
+        command.Parameters.AddWithValue("$lastHeartbeatUtc", DateTime.UtcNow.ToString(Iso8601Format, CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$errorMessage", (object?)errorMessage ?? DBNull.Value);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task UpdateWeKnoraSyncTaskProgressAsync(
+        long syncTaskId,
+        int processedDocuments,
+        int totalDocuments,
+        int failedDocuments,
+        string? currentArticleUrl,
+        int? currentArticleIndex,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = @"
+UPDATE weknora_sync_tasks
+SET processed_documents = $processedDocuments,
+    total_documents = $totalDocuments,
+    failed_documents = $failedDocuments,
+    current_article_url = $currentArticleUrl,
+    current_article_index = $currentArticleIndex,
+    last_heartbeat_utc = $lastHeartbeatUtc
+WHERE id = $syncTaskId;";
+        command.Parameters.AddWithValue("$syncTaskId", syncTaskId);
+        command.Parameters.AddWithValue("$processedDocuments", processedDocuments);
+        command.Parameters.AddWithValue("$totalDocuments", totalDocuments);
+        command.Parameters.AddWithValue("$failedDocuments", failedDocuments);
+        command.Parameters.AddWithValue("$currentArticleUrl", (object?)currentArticleUrl ?? DBNull.Value);
+        command.Parameters.AddWithValue("$currentArticleIndex", currentArticleIndex.HasValue ? currentArticleIndex.Value : DBNull.Value);
+        command.Parameters.AddWithValue("$lastHeartbeatUtc", DateTime.UtcNow.ToString(Iso8601Format, CultureInfo.InvariantCulture));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task TouchWeKnoraSyncTaskHeartbeatAsync(long syncTaskId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = @"
+UPDATE weknora_sync_tasks
+SET last_heartbeat_utc = $lastHeartbeatUtc
+WHERE id = $syncTaskId;";
+        command.Parameters.AddWithValue("$syncTaskId", syncTaskId);
+        command.Parameters.AddWithValue("$lastHeartbeatUtc", DateTime.UtcNow.ToString(Iso8601Format, CultureInfo.InvariantCulture));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task MarkInterruptedWeKnoraSyncTasksAsPausedAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = @"
+UPDATE weknora_sync_tasks
+SET status = 'Paused',
+    requested_pause = 1,
+    last_heartbeat_utc = $lastHeartbeatUtc,
+    error_message = CASE
+        WHEN error_message IS NULL OR error_message = '' THEN 'Recovered from previous session interruption.'
+        ELSE error_message
+    END
+WHERE status = 'Running';";
+        command.Parameters.AddWithValue("$lastHeartbeatUtc", DateTime.UtcNow.ToString(Iso8601Format, CultureInfo.InvariantCulture));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task UpsertWeKnoraSyncItemAsync(WeKnoraSyncItemRecord item, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = @"
+INSERT INTO weknora_sync_items(
+    sync_task_id,
+    article_url,
+    article_title,
+    output_relative_path,
+    status,
+    attempt_count,
+    content_hash,
+    remote_knowledge_id,
+    remote_parse_status,
+    last_error,
+    last_processed_utc)
+VALUES(
+    $syncTaskId,
+    $articleUrl,
+    $articleTitle,
+    $outputRelativePath,
+    $status,
+    $attemptCount,
+    $contentHash,
+    $remoteKnowledgeId,
+    $remoteParseStatus,
+    $lastError,
+    $lastProcessedUtc)
+ON CONFLICT(sync_task_id, article_url) DO UPDATE SET
+    article_title = excluded.article_title,
+    output_relative_path = excluded.output_relative_path,
+    status = excluded.status,
+    attempt_count = excluded.attempt_count,
+    content_hash = excluded.content_hash,
+    remote_knowledge_id = excluded.remote_knowledge_id,
+    remote_parse_status = excluded.remote_parse_status,
+    last_error = excluded.last_error,
+    last_processed_utc = excluded.last_processed_utc;";
+
+        command.Parameters.AddWithValue("$syncTaskId", item.SyncTaskId);
+        command.Parameters.AddWithValue("$articleUrl", item.ArticleUrl);
+        command.Parameters.AddWithValue("$articleTitle", (object?)item.ArticleTitle ?? DBNull.Value);
+        command.Parameters.AddWithValue("$outputRelativePath", (object?)item.OutputRelativePath ?? DBNull.Value);
+        command.Parameters.AddWithValue("$status", item.Status.ToString());
+        command.Parameters.AddWithValue("$attemptCount", item.AttemptCount);
+        command.Parameters.AddWithValue("$contentHash", (object?)item.ContentHash ?? DBNull.Value);
+        command.Parameters.AddWithValue("$remoteKnowledgeId", (object?)item.RemoteKnowledgeId ?? DBNull.Value);
+        command.Parameters.AddWithValue("$remoteParseStatus", (object?)item.RemoteParseStatus ?? DBNull.Value);
+        command.Parameters.AddWithValue("$lastError", (object?)item.LastError ?? DBNull.Value);
+        command.Parameters.AddWithValue("$lastProcessedUtc", item.LastProcessedUtc.HasValue ? item.LastProcessedUtc.Value.ToString(Iso8601Format, CultureInfo.InvariantCulture) : DBNull.Value);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<WeKnoraSyncItemRecord>> GetWeKnoraSyncItemsAsync(long syncTaskId, CancellationToken cancellationToken = default)
+    {
+        var items = new List<WeKnoraSyncItemRecord>();
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = @"
+SELECT id,
+       sync_task_id,
+       article_url,
+       article_title,
+       output_relative_path,
+       status,
+       attempt_count,
+       content_hash,
+       remote_knowledge_id,
+       remote_parse_status,
+       last_error,
+       last_processed_utc
+FROM weknora_sync_items
+WHERE sync_task_id = $syncTaskId
+ORDER BY article_url COLLATE NOCASE;";
+        command.Parameters.AddWithValue("$syncTaskId", syncTaskId);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            items.Add(ReadWeKnoraSyncItem(reader));
+        }
+
+        return items;
+    }
+
+    public async Task WriteWeKnoraSyncLogAsync(WeKnoraSyncLogEntryRecord entry, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = @"
+INSERT INTO weknora_sync_log_entries(sync_task_id, timestamp_utc, level, category, message, details, article_url, exception)
+VALUES($syncTaskId, $timestampUtc, $level, $category, $message, $details, $articleUrl, $exception);";
+
+        command.Parameters.AddWithValue("$syncTaskId", entry.SyncTaskId.HasValue ? entry.SyncTaskId.Value : DBNull.Value);
+        command.Parameters.AddWithValue("$timestampUtc", entry.TimestampUtc.ToString(Iso8601Format, CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$level", entry.Level.ToString());
+        command.Parameters.AddWithValue("$category", entry.Category);
+        command.Parameters.AddWithValue("$message", entry.Message);
+        command.Parameters.AddWithValue("$details", (object?)entry.Details ?? DBNull.Value);
+        command.Parameters.AddWithValue("$articleUrl", (object?)entry.ArticleUrl ?? DBNull.Value);
+        command.Parameters.AddWithValue("$exception", (object?)entry.Exception ?? DBNull.Value);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<WeKnoraSyncLogEntryRecord>> GetWeKnoraSyncLogsAsync(
+        string? searchText = null,
+        long? syncTaskId = null,
+        int limit = 500,
+        CancellationToken cancellationToken = default)
+    {
+        var entries = new List<WeKnoraSyncLogEntryRecord>();
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = @"
+SELECT id,
+       sync_task_id,
+       timestamp_utc,
+       level,
+       category,
+       message,
+       details,
+       article_url,
+       exception
+FROM weknora_sync_log_entries
+WHERE ($syncTaskId IS NULL OR sync_task_id = $syncTaskId)
+  AND ($searchText IS NULL
+    OR message LIKE '%' || $searchText || '%'
+    OR category LIKE '%' || $searchText || '%'
+    OR IFNULL(details, '') LIKE '%' || $searchText || '%'
+    OR IFNULL(article_url, '') LIKE '%' || $searchText || '%')
+ORDER BY timestamp_utc DESC
+LIMIT $limit;";
+        command.Parameters.AddWithValue("$syncTaskId", syncTaskId.HasValue ? syncTaskId.Value : DBNull.Value);
+        command.Parameters.AddWithValue("$searchText", (object?)searchText ?? DBNull.Value);
+        command.Parameters.AddWithValue("$limit", Math.Max(1, limit));
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            entries.Add(ReadWeKnoraSyncLogEntry(reader));
+        }
+
+        return entries;
+    }
+
     public async Task SaveArchiveMetadataAsync(long taskId, ZimArchiveMetadata metadata, CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenConnectionAsync(cancellationToken);
@@ -834,6 +1383,68 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;";
         {
             Id = reader.GetInt64(0),
             TaskId = ReadNullableInt64(reader, 1),
+            TimestampUtc = ReadDateTime(reader, 2) ?? DateTime.MinValue,
+            Level = Enum.TryParse<LogSeverity>(reader.GetString(3), out var level) ? level : LogSeverity.Info,
+            Category = reader.GetString(4),
+            Message = reader.GetString(5),
+            Details = ReadNullableString(reader, 6),
+            ArticleUrl = ReadNullableString(reader, 7),
+            Exception = ReadNullableString(reader, 8)
+        };
+    }
+
+    private static WeKnoraSyncTaskRecord ReadWeKnoraSyncTask(SqliteDataReader reader)
+    {
+        return new WeKnoraSyncTaskRecord
+        {
+            Id = reader.GetInt64(0),
+            SourceTaskId = reader.GetInt64(1),
+            SourceArchiveKey = reader.GetString(2),
+            SourceOutputDirectory = reader.GetString(3),
+            BaseUrl = reader.GetString(4),
+            AuthMode = reader.GetString(5),
+            KnowledgeBaseId = reader.GetString(6),
+            KnowledgeBaseName = ReadNullableString(reader, 7),
+            Status = Enum.TryParse<ConversionTaskStatus>(reader.GetString(8), out var status) ? status : ConversionTaskStatus.Pending,
+            CreatedUtc = ReadDateTime(reader, 9) ?? DateTime.MinValue,
+            StartedUtc = ReadDateTime(reader, 10),
+            CompletedUtc = ReadDateTime(reader, 11),
+            LastHeartbeatUtc = ReadDateTime(reader, 12),
+            RequestedPause = reader.GetInt64(13) == 1,
+            ProcessedDocuments = reader.GetInt32(14),
+            TotalDocuments = reader.GetInt32(15),
+            FailedDocuments = reader.GetInt32(16),
+            CurrentArticleUrl = ReadNullableString(reader, 17),
+            CurrentArticleIndex = ReadNullableInt32(reader, 18),
+            ErrorMessage = ReadNullableString(reader, 19)
+        };
+    }
+
+    private static WeKnoraSyncItemRecord ReadWeKnoraSyncItem(SqliteDataReader reader)
+    {
+        return new WeKnoraSyncItemRecord
+        {
+            Id = reader.GetInt64(0),
+            SyncTaskId = reader.GetInt64(1),
+            ArticleUrl = reader.GetString(2),
+            ArticleTitle = ReadNullableString(reader, 3),
+            OutputRelativePath = ReadNullableString(reader, 4),
+            Status = Enum.TryParse<ArticleStatus>(reader.GetString(5), out var status) ? status : ArticleStatus.Pending,
+            AttemptCount = reader.GetInt32(6),
+            ContentHash = ReadNullableString(reader, 7),
+            RemoteKnowledgeId = ReadNullableString(reader, 8),
+            RemoteParseStatus = ReadNullableString(reader, 9),
+            LastError = ReadNullableString(reader, 10),
+            LastProcessedUtc = ReadDateTime(reader, 11)
+        };
+    }
+
+    private static WeKnoraSyncLogEntryRecord ReadWeKnoraSyncLogEntry(SqliteDataReader reader)
+    {
+        return new WeKnoraSyncLogEntryRecord
+        {
+            Id = reader.GetInt64(0),
+            SyncTaskId = ReadNullableInt64(reader, 1),
             TimestampUtc = ReadDateTime(reader, 2) ?? DateTime.MinValue,
             Level = Enum.TryParse<LogSeverity>(reader.GetString(3), out var level) ? level : LogSeverity.Info,
             Category = reader.GetString(4),

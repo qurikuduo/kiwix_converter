@@ -9,7 +9,7 @@
 ## GitHub Actions Flow
 
 1. `ci.yml` runs on pushes to `main` and on pull requests.
-2. `release.yml` runs on semantic version tags or by `workflow_dispatch` with an explicit version input.
+2. `release.yml` runs on every push to `main`, calculates the next semantic patch version from the latest release tag, and can still be launched by `workflow_dispatch` with an explicit version override.
 3. The release workflow builds the WinForms application, publishes the Windows package, generates checksums, and creates a GitHub release.
 
 ## Release Assets

@@ -1,9 +1,10 @@
+using System.Globalization;
 using KiwixConverter.Core.Models;
 using KiwixConverter.Core.Services;
 
 namespace KiwixConverter.WinForms;
 
-public sealed class MainForm : Form
+public sealed partial class MainForm : Form
 {
     private readonly KiwixAppService _appService = new();
     private readonly NotifyIcon _notifyIcon = new();
@@ -46,6 +47,7 @@ public sealed class MainForm : Form
         MinimumSize = new Size(1200, 760);
         StartPosition = FormStartPosition.CenterScreen;
 
+        InitializeWeKnoraControls();
         BuildLayout();
         WireEvents();
 
@@ -95,16 +97,18 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 3,
+            RowCount = 4,
             Padding = new Padding(8)
         };
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         layout.Controls.Add(BuildSettingsGroup(), 0, 0);
-        layout.Controls.Add(BuildConversionGroup(), 0, 1);
-        layout.Controls.Add(BuildDownloadsGroup(), 0, 2);
+        layout.Controls.Add(BuildWeKnoraSettingsGroup(), 0, 1);
+        layout.Controls.Add(BuildConversionGroup(), 0, 2);
+        layout.Controls.Add(BuildDownloadsGroup(), 0, 3);
         return layout;
     }
 
@@ -227,6 +231,7 @@ public sealed class MainForm : Form
         tabs.TabPages.Add(BuildTasksTab());
         tabs.TabPages.Add(BuildHistoryTab());
         tabs.TabPages.Add(BuildLogsTab());
+        tabs.TabPages.Add(BuildWeKnoraSyncTab());
         return tabs;
     }
 
@@ -347,6 +352,7 @@ public sealed class MainForm : Form
         _refreshLogsButton.Click += async (_, _) => await RefreshAllViewsAsync();
         _refreshTimer.Tick += async (_, _) => await RefreshAllViewsAsync();
         FormClosing += OnMainFormClosingAsync;
+        WireWeKnoraEvents();
     }
 
     private async Task InitializeAsync()
@@ -361,7 +367,10 @@ public sealed class MainForm : Form
                 return;
             }
 
+            await EnsureZimdumpAvailableAsync();
+
             await ScanAndRefreshAsync(initialLoad: true);
+            await TryLoadWeKnoraKnowledgeBasesAsync();
             _refreshTimer.Start();
             SetStatus("Ready.");
         }
@@ -379,6 +388,15 @@ public sealed class MainForm : Form
         _defaultOutputDirectoryTextBox.Text = settings.DefaultOutputDirectory ?? string.Empty;
         _zimdumpPathTextBox.Text = settings.ZimdumpExecutablePath ?? string.Empty;
         _snapshotIntervalUpDown.Value = Math.Min(_snapshotIntervalUpDown.Maximum, Math.Max(_snapshotIntervalUpDown.Minimum, settings.SnapshotIntervalSeconds));
+        _weKnoraBaseUrlTextBox.Text = settings.WeKnoraBaseUrl ?? string.Empty;
+        _weKnoraAccessTokenTextBox.Text = settings.WeKnoraAccessToken ?? string.Empty;
+        _weKnoraKnowledgeBaseIdTextBox.Text = settings.WeKnoraKnowledgeBaseId ?? string.Empty;
+        _weKnoraKnowledgeBaseNameTextBox.Text = settings.WeKnoraKnowledgeBaseName ?? string.Empty;
+        _weKnoraChatModelIdTextBox.Text = settings.WeKnoraChatModelId ?? string.Empty;
+        _weKnoraMultimodalModelIdTextBox.Text = settings.WeKnoraMultimodalModelId ?? string.Empty;
+        _weKnoraAuthModeComboBox.SelectedItem = settings.WeKnoraAuthMode.ToString();
+        _weKnoraAutoCreateKnowledgeBaseCheckBox.Checked = settings.WeKnoraAutoCreateKnowledgeBase;
+        _weKnoraAppendMetadataCheckBox.Checked = settings.WeKnoraAppendMetadataBlock;
     }
 
     private async Task<bool> EnsureRequiredDirectoriesConfiguredAsync()
@@ -420,7 +438,16 @@ public sealed class MainForm : Form
             KiwixDesktopDirectory = string.IsNullOrWhiteSpace(_kiwixDirectoryTextBox.Text) ? null : _kiwixDirectoryTextBox.Text.Trim(),
             DefaultOutputDirectory = string.IsNullOrWhiteSpace(_defaultOutputDirectoryTextBox.Text) ? null : _defaultOutputDirectoryTextBox.Text.Trim(),
             ZimdumpExecutablePath = string.IsNullOrWhiteSpace(_zimdumpPathTextBox.Text) ? null : _zimdumpPathTextBox.Text.Trim(),
-            SnapshotIntervalSeconds = (int)_snapshotIntervalUpDown.Value
+            SnapshotIntervalSeconds = (int)_snapshotIntervalUpDown.Value,
+            WeKnoraBaseUrl = string.IsNullOrWhiteSpace(_weKnoraBaseUrlTextBox.Text) ? null : _weKnoraBaseUrlTextBox.Text.Trim(),
+            WeKnoraAccessToken = string.IsNullOrWhiteSpace(_weKnoraAccessTokenTextBox.Text) ? null : _weKnoraAccessTokenTextBox.Text.Trim(),
+            WeKnoraKnowledgeBaseId = string.IsNullOrWhiteSpace(_weKnoraKnowledgeBaseIdTextBox.Text) ? null : _weKnoraKnowledgeBaseIdTextBox.Text.Trim(),
+            WeKnoraKnowledgeBaseName = string.IsNullOrWhiteSpace(_weKnoraKnowledgeBaseNameTextBox.Text) ? null : _weKnoraKnowledgeBaseNameTextBox.Text.Trim(),
+            WeKnoraChatModelId = string.IsNullOrWhiteSpace(_weKnoraChatModelIdTextBox.Text) ? null : _weKnoraChatModelIdTextBox.Text.Trim(),
+            WeKnoraMultimodalModelId = string.IsNullOrWhiteSpace(_weKnoraMultimodalModelIdTextBox.Text) ? null : _weKnoraMultimodalModelIdTextBox.Text.Trim(),
+            WeKnoraAuthMode = Enum.TryParse<WeKnoraAuthMode>(_weKnoraAuthModeComboBox.SelectedItem?.ToString(), out var authMode) ? authMode : WeKnoraAuthMode.ApiKey,
+            WeKnoraAutoCreateKnowledgeBase = _weKnoraAutoCreateKnowledgeBaseCheckBox.Checked,
+            WeKnoraAppendMetadataBlock = _weKnoraAppendMetadataCheckBox.Checked
         };
 
         await _appService.SaveSettingsAsync(settings);
@@ -456,6 +483,12 @@ public sealed class MainForm : Form
             var logs = await _appService.GetLogsAsync(
                 string.IsNullOrWhiteSpace(_logSearchTextBox.Text) ? null : _logSearchTextBox.Text.Trim(),
                 _selectedTaskLogsOnlyCheckBox.Checked ? GetSelectedTaskId() : null,
+                500);
+            var syncTasks = await _appService.GetWeKnoraSyncTasksAsync(
+                string.IsNullOrWhiteSpace(_weKnoraSyncSearchTextBox.Text) ? null : _weKnoraSyncSearchTextBox.Text.Trim());
+            var syncLogs = await _appService.GetWeKnoraSyncLogsAsync(
+                string.IsNullOrWhiteSpace(_weKnoraSyncLogSearchTextBox.Text) ? null : _weKnoraSyncLogSearchTextBox.Text.Trim(),
+                _selectedWeKnoraSyncLogsOnlyCheckBox.Checked ? GetSelectedWeKnoraSyncTaskId() : null,
                 500);
 
             _downloadsGrid.DataSource = downloads.Select(static item => new DownloadRow
@@ -509,6 +542,8 @@ public sealed class MainForm : Form
                 ArticleUrl = log.ArticleUrl ?? string.Empty,
                 Details = log.Details ?? string.Empty
             }).ToList();
+
+            BindWeKnoraViewData(tasks, syncTasks, syncLogs);
 
             if (initialLoad)
             {
@@ -638,6 +673,34 @@ public sealed class MainForm : Form
     private void SetStatus(string message)
     {
         _statusLabel.Text = message;
+    }
+
+    private static string FormatEta(int processed, int total, DateTime? startedUtc)
+    {
+        if (!startedUtc.HasValue || processed <= 0 || total <= processed)
+        {
+            return "n/a";
+        }
+
+        var elapsed = DateTime.UtcNow - startedUtc.Value;
+        if (elapsed <= TimeSpan.Zero)
+        {
+            return "n/a";
+        }
+
+        var itemsPerSecond = processed / elapsed.TotalSeconds;
+        if (itemsPerSecond <= 0)
+        {
+            return "n/a";
+        }
+
+        var remaining = TimeSpan.FromSeconds((total - processed) / itemsPerSecond);
+        if (remaining.TotalHours >= 1)
+        {
+            return remaining.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture);
+        }
+
+        return remaining.ToString(@"m\:ss", CultureInfo.InvariantCulture);
     }
 
     private static void AddLabeledRow(TableLayoutPanel table, int rowIndex, string label, Control control, Control accessory)

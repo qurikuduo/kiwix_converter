@@ -2,17 +2,21 @@ name: release
 
 on:
   push:
-    tags:
-      - v*.*.*
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       version:
-        description: Release tag in semantic version format, for example v0.1.0
-        required: true
+        description: Optional release tag in semantic version format, for example v0.1.0
+        required: false
         type: string
 
 permissions:
   contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   release:
@@ -29,15 +33,62 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Fetch release tags
+        shell: pwsh
+        run: git fetch --force --tags origin
+
       - name: Resolve version
         id: version
         shell: pwsh
         run: |
-          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
-            $version = '${{ inputs.version }}'
+          function Parse-SemVerTag([string] $tag) {
+            if ($tag -match '^v(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)(-(?<suffix>[0-9A-Za-z\.-]+))?$') {
+              return [pscustomobject]@{
+                Major = [int] $Matches.major
+                Minor = [int] $Matches.minor
+                Patch = [int] $Matches.patch
+                Suffix = $Matches.suffix
+              }
+            }
+
+            return $null
+          }
+
+          $requestedVersion = '${{ inputs.version }}'
+          if (-not [string]::IsNullOrWhiteSpace($requestedVersion)) {
+            $version = $requestedVersion.Trim()
+            $previousTag = git tag --sort=-version:refname |
+              Where-Object { $_ -match '^v\d+\.\d+\.\d+(-[0-9A-Za-z\.-]+)?$' -and $_ -ne $version } |
+              Select-Object -First 1
           }
           else {
-            $version = '${{ github.ref_name }}'
+            $headTag = git tag --points-at HEAD |
+              Where-Object { $_ -match '^v\d+\.\d+\.\d+(-[0-9A-Za-z\.-]+)?$' } |
+              Select-Object -First 1
+
+            if (-not [string]::IsNullOrWhiteSpace($headTag)) {
+              $version = $headTag.Trim()
+              $previousTag = git tag --sort=-version:refname |
+                Where-Object { $_ -match '^v\d+\.\d+\.\d+(-[0-9A-Za-z\.-]+)?$' -and $_ -ne $version } |
+                Select-Object -First 1
+            }
+            else {
+              $previousTag = git tag --sort=-version:refname |
+                Where-Object { $_ -match '^v\d+\.\d+\.\d+(-[0-9A-Za-z\.-]+)?$' } |
+                Select-Object -First 1
+
+              if ([string]::IsNullOrWhiteSpace($previousTag)) {
+                $version = 'v0.1.0'
+              }
+              else {
+                $parsed = Parse-SemVerTag $previousTag
+                if ($null -eq $parsed) {
+                  throw "Unable to parse the latest semantic version tag '$previousTag'."
+                }
+
+                $version = 'v{0}.{1}.{2}' -f $parsed.Major, $parsed.Minor, ($parsed.Patch + 1)
+              }
+            }
           }
 
           if (-not $version.StartsWith('v')) {
@@ -51,6 +102,7 @@ jobs:
           $clean = $version.Substring(1)
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "clean=$clean" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "previous=$previousTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Generate release notes
         id: notes
@@ -59,9 +111,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path artifacts/package | Out-Null
 
           $currentVersion = '${{ steps.version.outputs.version }}'
-          $previousTag = git tag --sort=-version:refname |
-            Where-Object { $_ -match '^v\d+\.\d+\.\d+(-[0-9A-Za-z\.-]+)?$' -and $_ -ne $currentVersion } |
-            Select-Object -First 1
+          $previousTag = '${{ steps.version.outputs.previous }}'
 
           if ([string]::IsNullOrWhiteSpace($previousTag)) {
             $commitLines = git log --pretty=format:'- %s (%h)' --no-merges
@@ -141,6 +191,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
           name: Kiwix Converter ${{ steps.version.outputs.version }}
           body_path: ${{ steps.notes.outputs.path }}
           files: |
