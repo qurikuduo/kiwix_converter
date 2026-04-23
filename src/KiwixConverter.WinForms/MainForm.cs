@@ -8,6 +8,10 @@ namespace KiwixConverter.WinForms;
 
 public sealed partial class MainForm : Form
 {
+    private const int DefaultWindowWidth = 1760;
+    private const int DefaultWindowHeight = 920;
+    private const int DefaultRootSplitterDistance = 680;
+
     private readonly KiwixAppService _appService = new();
     private readonly NotifyIcon _notifyIcon = new();
     private readonly System.Windows.Forms.Timer _refreshTimer = new() { Interval = 5000 };
@@ -46,6 +50,7 @@ public sealed partial class MainForm : Form
 
     private bool _allowClose;
     private bool _isRefreshing;
+    private int _preferredRootSplitterDistance = DefaultRootSplitterDistance;
 
     public MainForm()
     {
@@ -58,8 +63,8 @@ public sealed partial class MainForm : Form
         try
         {
             Text = BuildWindowTitle();
-            Width = 1760;
-            Height = 920;
+            Width = DefaultWindowWidth;
+            Height = DefaultWindowHeight;
             MinimumSize = new Size(1460, 760);
             StartPosition = FormStartPosition.CenterScreen;
 
@@ -221,7 +226,9 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        var desiredSplitterDistance = Math.Max(_rootSplitContainer.Panel1MinSize, Math.Min(680, maxSplitterDistance));
+        var desiredSplitterDistance = Math.Max(
+            _rootSplitContainer.Panel1MinSize,
+            Math.Min(_preferredRootSplitterDistance, maxSplitterDistance));
         if (_rootSplitContainer.SplitterDistance != desiredSplitterDistance)
         {
             _rootSplitContainer.SplitterDistance = desiredSplitterDistance;
@@ -728,6 +735,7 @@ public sealed partial class MainForm : Form
             _kiwixDirectoryTextBox.Text = settings.KiwixDesktopDirectory ?? string.Empty;
             _defaultOutputDirectoryTextBox.Text = settings.DefaultOutputDirectory ?? string.Empty;
             _zimdumpPathTextBox.Text = settings.ZimdumpExecutablePath ?? string.Empty;
+            _taskOutputOverrideTextBox.Text = settings.TaskOutputOverrideDirectory ?? string.Empty;
             _snapshotIntervalUpDown.Value = Math.Min(_snapshotIntervalUpDown.Maximum, Math.Max(_snapshotIntervalUpDown.Minimum, settings.SnapshotIntervalSeconds));
             _weKnoraBaseUrlTextBox.Text = settings.WeKnoraBaseUrl ?? string.Empty;
             _weKnoraAccessTokenTextBox.Text = settings.WeKnoraAccessToken ?? string.Empty;
@@ -743,6 +751,13 @@ public sealed partial class MainForm : Form
             _weKnoraAuthModeComboBox.SelectedItem = settings.WeKnoraAuthMode.ToString();
             _weKnoraAutoCreateKnowledgeBaseCheckBox.Checked = settings.WeKnoraAutoCreateKnowledgeBase;
             _weKnoraAppendMetadataCheckBox.Checked = settings.WeKnoraAppendMetadataBlock;
+            _historySearchTextBox.Text = settings.HistorySearchText ?? string.Empty;
+            _logSearchTextBox.Text = settings.LogSearchText ?? string.Empty;
+            _selectedTaskLogsOnlyCheckBox.Checked = settings.SelectedTaskLogsOnly;
+            _weKnoraSyncSearchTextBox.Text = settings.WeKnoraSyncSearchText ?? string.Empty;
+            _weKnoraSyncLogSearchTextBox.Text = settings.WeKnoraSyncLogSearchText ?? string.Empty;
+            _selectedWeKnoraSyncLogsOnlyCheckBox.Checked = settings.SelectedWeKnoraSyncLogsOnly;
+            ApplyStoredLayoutPreferences(settings);
 
             scope.Success(SummarizeAppSettings(settings));
         }
@@ -793,11 +808,14 @@ public sealed partial class MainForm : Form
     {
         using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(SaveSettingsAsync), new { silent });
 
+        var persistedWindowSize = GetPersistedWindowSize();
+
         var settings = new AppSettings
         {
             KiwixDesktopDirectory = string.IsNullOrWhiteSpace(_kiwixDirectoryTextBox.Text) ? null : _kiwixDirectoryTextBox.Text.Trim(),
             DefaultOutputDirectory = string.IsNullOrWhiteSpace(_defaultOutputDirectoryTextBox.Text) ? null : _defaultOutputDirectoryTextBox.Text.Trim(),
             ZimdumpExecutablePath = string.IsNullOrWhiteSpace(_zimdumpPathTextBox.Text) ? null : _zimdumpPathTextBox.Text.Trim(),
+            TaskOutputOverrideDirectory = string.IsNullOrWhiteSpace(_taskOutputOverrideTextBox.Text) ? null : _taskOutputOverrideTextBox.Text.Trim(),
             SnapshotIntervalSeconds = (int)_snapshotIntervalUpDown.Value,
             WeKnoraBaseUrl = string.IsNullOrWhiteSpace(_weKnoraBaseUrlTextBox.Text) ? null : _weKnoraBaseUrlTextBox.Text.Trim(),
             WeKnoraAccessToken = string.IsNullOrWhiteSpace(_weKnoraAccessTokenTextBox.Text) ? null : _weKnoraAccessTokenTextBox.Text.Trim(),
@@ -812,7 +830,17 @@ public sealed partial class MainForm : Form
             WeKnoraEnableParentChild = _weKnoraEnableParentChildCheckBox.Checked,
             WeKnoraAuthMode = Enum.TryParse<WeKnoraAuthMode>(_weKnoraAuthModeComboBox.SelectedItem?.ToString(), out var authMode) ? authMode : WeKnoraAuthMode.ApiKey,
             WeKnoraAutoCreateKnowledgeBase = _weKnoraAutoCreateKnowledgeBaseCheckBox.Checked,
-            WeKnoraAppendMetadataBlock = _weKnoraAppendMetadataCheckBox.Checked
+            WeKnoraAppendMetadataBlock = _weKnoraAppendMetadataCheckBox.Checked,
+            HistorySearchText = string.IsNullOrWhiteSpace(_historySearchTextBox.Text) ? null : _historySearchTextBox.Text.Trim(),
+            LogSearchText = string.IsNullOrWhiteSpace(_logSearchTextBox.Text) ? null : _logSearchTextBox.Text.Trim(),
+            SelectedTaskLogsOnly = _selectedTaskLogsOnlyCheckBox.Checked,
+            WeKnoraSyncSearchText = string.IsNullOrWhiteSpace(_weKnoraSyncSearchTextBox.Text) ? null : _weKnoraSyncSearchTextBox.Text.Trim(),
+            WeKnoraSyncLogSearchText = string.IsNullOrWhiteSpace(_weKnoraSyncLogSearchTextBox.Text) ? null : _weKnoraSyncLogSearchTextBox.Text.Trim(),
+            SelectedWeKnoraSyncLogsOnly = _selectedWeKnoraSyncLogsOnlyCheckBox.Checked,
+            MainWindowWidth = Math.Max(MinimumSize.Width, persistedWindowSize.Width),
+            MainWindowHeight = Math.Max(MinimumSize.Height, persistedWindowSize.Height),
+            RootSplitterDistance = _rootSplitContainer.SplitterDistance > 0 ? _rootSplitContainer.SplitterDistance : DefaultRootSplitterDistance,
+            WeKnoraSyncUpperSplitterDistance = _weKnoraSyncUpperSplitContainer.SplitterDistance > 0 ? _weKnoraSyncUpperSplitContainer.SplitterDistance : DefaultWeKnoraSyncUpperSplitterDistance
         };
 
         try
@@ -839,6 +867,10 @@ public sealed partial class MainForm : Form
             kiwixDirectory = FileTraceLogger.SummarizePath(_kiwixDirectoryTextBox.Text),
             defaultOutputDirectory = FileTraceLogger.SummarizePath(_defaultOutputDirectoryTextBox.Text),
             zimdumpExecutablePath = FileTraceLogger.SummarizePath(_zimdumpPathTextBox.Text),
+            taskOutputOverride = FileTraceLogger.SummarizePath(_taskOutputOverrideTextBox.Text),
+            historySearchText = FileTraceLogger.SummarizeText(_historySearchTextBox.Text, 240),
+            logSearchText = FileTraceLogger.SummarizeText(_logSearchTextBox.Text, 240),
+            selectedTaskLogsOnly = _selectedTaskLogsOnlyCheckBox.Checked,
             snapshotIntervalSeconds = (int)_snapshotIntervalUpDown.Value,
             weKnoraBaseUrl = FileTraceLogger.SummarizeText(_weKnoraBaseUrlTextBox.Text, 240),
             weKnoraAccessToken = FileTraceLogger.RedactSecret(_weKnoraAccessTokenTextBox.Text),
@@ -853,7 +885,14 @@ public sealed partial class MainForm : Form
             weKnoraEnableParentChild = _weKnoraEnableParentChildCheckBox.Checked,
             weKnoraAuthMode = _weKnoraAuthModeComboBox.SelectedItem?.ToString(),
             weKnoraAutoCreateKnowledgeBase = _weKnoraAutoCreateKnowledgeBaseCheckBox.Checked,
-            weKnoraAppendMetadataBlock = _weKnoraAppendMetadataCheckBox.Checked
+            weKnoraAppendMetadataBlock = _weKnoraAppendMetadataCheckBox.Checked,
+            weKnoraSyncSearchText = FileTraceLogger.SummarizeText(_weKnoraSyncSearchTextBox.Text, 240),
+            weKnoraSyncLogSearchText = FileTraceLogger.SummarizeText(_weKnoraSyncLogSearchTextBox.Text, 240),
+            selectedWeKnoraSyncLogsOnly = _selectedWeKnoraSyncLogsOnlyCheckBox.Checked,
+            mainWindowWidth = Width,
+            mainWindowHeight = Height,
+            rootSplitterDistance = _rootSplitContainer.SplitterDistance,
+            weKnoraSyncUpperSplitterDistance = _weKnoraSyncUpperSplitContainer.SplitterDistance
         };
     }
 
@@ -864,6 +903,7 @@ public sealed partial class MainForm : Form
             kiwixDirectory = FileTraceLogger.SummarizePath(settings.KiwixDesktopDirectory),
             defaultOutputDirectory = FileTraceLogger.SummarizePath(settings.DefaultOutputDirectory),
             zimdumpExecutablePath = FileTraceLogger.SummarizePath(settings.ZimdumpExecutablePath),
+            taskOutputOverride = FileTraceLogger.SummarizePath(settings.TaskOutputOverrideDirectory),
             snapshotIntervalSeconds = settings.SnapshotIntervalSeconds,
             weKnoraBaseUrl = FileTraceLogger.SummarizeText(settings.WeKnoraBaseUrl, 240),
             weKnoraAccessToken = FileTraceLogger.RedactSecret(settings.WeKnoraAccessToken),
@@ -878,8 +918,44 @@ public sealed partial class MainForm : Form
             weKnoraEnableParentChild = settings.WeKnoraEnableParentChild,
             weKnoraAuthMode = settings.WeKnoraAuthMode.ToString(),
             weKnoraAutoCreateKnowledgeBase = settings.WeKnoraAutoCreateKnowledgeBase,
-            weKnoraAppendMetadataBlock = settings.WeKnoraAppendMetadataBlock
+            weKnoraAppendMetadataBlock = settings.WeKnoraAppendMetadataBlock,
+            historySearchText = FileTraceLogger.SummarizeText(settings.HistorySearchText, 240),
+            logSearchText = FileTraceLogger.SummarizeText(settings.LogSearchText, 240),
+            settings.SelectedTaskLogsOnly,
+            weKnoraSyncSearchText = FileTraceLogger.SummarizeText(settings.WeKnoraSyncSearchText, 240),
+            weKnoraSyncLogSearchText = FileTraceLogger.SummarizeText(settings.WeKnoraSyncLogSearchText, 240),
+            settings.SelectedWeKnoraSyncLogsOnly,
+            settings.MainWindowWidth,
+            settings.MainWindowHeight,
+            settings.RootSplitterDistance,
+            settings.WeKnoraSyncUpperSplitterDistance
         };
+    }
+
+    private void ApplyStoredLayoutPreferences(AppSettings settings)
+    {
+        var windowWidth = Math.Max(MinimumSize.Width, settings.MainWindowWidth > 0 ? settings.MainWindowWidth : DefaultWindowWidth);
+        var windowHeight = Math.Max(MinimumSize.Height, settings.MainWindowHeight > 0 ? settings.MainWindowHeight : DefaultWindowHeight);
+
+        if (Width != windowWidth || Height != windowHeight)
+        {
+            Size = new Size(windowWidth, windowHeight);
+        }
+
+        _preferredRootSplitterDistance = settings.RootSplitterDistance > 0
+            ? settings.RootSplitterDistance
+            : DefaultRootSplitterDistance;
+
+        EnsureRootSplitterDistance();
+        ApplyWeKnoraSyncUpperSplitterDistance(settings.WeKnoraSyncUpperSplitterDistance);
+    }
+
+    private Size GetPersistedWindowSize()
+    {
+        var bounds = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
+        var width = bounds.Width > 0 ? bounds.Width : Width;
+        var height = bounds.Height > 0 ? bounds.Height : Height;
+        return new Size(width, height);
     }
 
     private static object SummarizeToolAvailability(ToolAvailabilityResult availability)
@@ -1126,6 +1202,7 @@ public sealed partial class MainForm : Form
 
         try
         {
+            await SaveSettingsAsync(silent: true);
             await _appService.PauseAllAsync();
         }
         catch (Exception exception)

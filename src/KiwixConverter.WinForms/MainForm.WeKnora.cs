@@ -5,6 +5,8 @@ namespace KiwixConverter.WinForms;
 
 public sealed partial class MainForm
 {
+    private const int DefaultWeKnoraSyncUpperSplitterDistance = 230;
+
     private readonly TextBox _weKnoraBaseUrlTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "http://localhost:8080" };
     private readonly TextBox _weKnoraAccessTokenTextBox = new() { Dock = DockStyle.Fill, UseSystemPasswordChar = true };
     private readonly TextBox _weKnoraKnowledgeBaseNameTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Existing or new knowledge base name" };
@@ -35,6 +37,14 @@ public sealed partial class MainForm
     private readonly DataGridView _weKnoraSyncCandidatesGrid = CreateGrid();
     private readonly DataGridView _weKnoraSyncTasksGrid = CreateGrid();
     private readonly DataGridView _weKnoraSyncLogsGrid = CreateGrid();
+    private readonly SplitContainer _weKnoraSyncUpperSplitContainer = new()
+    {
+        Dock = DockStyle.Fill,
+        Orientation = Orientation.Horizontal,
+        Panel1MinSize = 140,
+        Panel2MinSize = 180,
+        SplitterDistance = DefaultWeKnoraSyncUpperSplitterDistance
+    };
 
     private readonly ProgressBar _weKnoraSyncProgressBar = new() { Dock = DockStyle.Top, Height = 18, Minimum = 0, Maximum = 100, Style = ProgressBarStyle.Continuous };
     private readonly Label _weKnoraSyncSummaryLabel = new() { Dock = DockStyle.Top, AutoSize = true, Text = "No WeKnora sync task selected." };
@@ -174,15 +184,9 @@ public sealed partial class MainForm
         controlsPanel.Controls.Add(new Label { Text = "Select rows in the candidate grid to create sync tasks.", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(12, 8, 0, 0) }, 5, 0);
         root.Controls.Add(controlsPanel, 0, 1);
 
-        var upperSplit = new SplitContainer
-        {
-            Dock = DockStyle.Fill,
-            Orientation = Orientation.Horizontal,
-            SplitterDistance = 230
-        };
-        upperSplit.Panel1.Controls.Add(BuildWeKnoraCandidatesGroup());
-        upperSplit.Panel2.Controls.Add(BuildWeKnoraTaskGroup());
-        root.Controls.Add(upperSplit, 0, 2);
+        _weKnoraSyncUpperSplitContainer.Panel1.Controls.Add(BuildWeKnoraCandidatesGroup());
+        _weKnoraSyncUpperSplitContainer.Panel2.Controls.Add(BuildWeKnoraTaskGroup());
+        root.Controls.Add(_weKnoraSyncUpperSplitContainer, 0, 2);
 
         root.Controls.Add(BuildWeKnoraLogsGroup(), 0, 3);
 
@@ -299,6 +303,32 @@ public sealed partial class MainForm
         _refreshWeKnoraSyncButton.Click += async (_, _) => await RefreshAllViewsAsync();
         _weKnoraKnowledgeBaseComboBox.SelectionChangeCommitted += (_, _) => ApplySelectedKnowledgeBaseChoice();
         _weKnoraSyncTasksGrid.SelectionChanged += (_, _) => UpdateWeKnoraSyncSummary();
+    }
+
+    private void ApplyWeKnoraSyncUpperSplitterDistance(int requestedSplitterDistance)
+    {
+        if (_weKnoraSyncUpperSplitContainer.Height <= 0)
+        {
+            return;
+        }
+
+        var maxSplitterDistance = _weKnoraSyncUpperSplitContainer.Height - _weKnoraSyncUpperSplitContainer.Panel2MinSize;
+        if (maxSplitterDistance < _weKnoraSyncUpperSplitContainer.Panel1MinSize)
+        {
+            return;
+        }
+
+        var preferredSplitterDistance = requestedSplitterDistance > 0
+            ? requestedSplitterDistance
+            : DefaultWeKnoraSyncUpperSplitterDistance;
+        var desiredSplitterDistance = Math.Max(
+            _weKnoraSyncUpperSplitContainer.Panel1MinSize,
+            Math.Min(preferredSplitterDistance, maxSplitterDistance));
+
+        if (_weKnoraSyncUpperSplitContainer.SplitterDistance != desiredSplitterDistance)
+        {
+            _weKnoraSyncUpperSplitContainer.SplitterDistance = desiredSplitterDistance;
+        }
     }
 
     private async Task EnsureZimdumpAvailableAsync()
