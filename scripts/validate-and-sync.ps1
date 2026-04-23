@@ -87,34 +87,14 @@ function Get-LocalCommitMetadata {
 
 function Test-CommitEquivalence {
     param(
+        [string]$RepositoryName,
         [string]$LocalCommitSha,
-        [object]$RemoteCommit
+        [object]$RemoteCommit,
+        [int]$Depth = 0
     )
 
     $localCommit = Get-LocalCommitMetadata -CommitSha $LocalCommitSha
-    $localParentShas = @($localCommit.ParentShas | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-    $remoteParentShas = @($RemoteCommit.parents | ForEach-Object { $_.sha } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-    $remoteAuthorDate = [DateTimeOffset]::Parse($RemoteCommit.author.date)
-    $remoteCommitterDate = [DateTimeOffset]::Parse($RemoteCommit.committer.date)
-
-    if ($localParentShas.Count -ne $remoteParentShas.Count) {
-        return $false
-    }
-
-    for ($index = 0; $index -lt $localParentShas.Count; $index++) {
-        if ($localParentShas[$index] -ne $remoteParentShas[$index]) {
-            return $false
-        }
-    }
-
-    return $localCommit.TreeSha -eq $RemoteCommit.tree.sha -and
-        $localCommit.AuthorName -eq $RemoteCommit.author.name -and
-        $localCommit.AuthorEmail -eq $RemoteCommit.author.email -and
-        $localCommit.AuthorDate.ToUniversalTime() -eq $remoteAuthorDate.ToUniversalTime() -and
-        $localCommit.CommitterName -eq $RemoteCommit.committer.name -and
-        $localCommit.CommitterEmail -eq $RemoteCommit.committer.email -and
-        $localCommit.CommitterDate.ToUniversalTime() -eq $remoteCommitterDate.ToUniversalTime() -and
-        $localCommit.Message -eq ([string]$RemoteCommit.message)
+    return $localCommit.TreeSha -eq $RemoteCommit.tree.sha
 }
 
 function Update-EquivalentTrackingRefs {
@@ -152,6 +132,10 @@ if (-not $SkipBuild) {
 $workingTreeStatus = & git status --porcelain
 Assert-LastExitCode "git status --porcelain"
 
+if ($SkipCommit -and $workingTreeStatus) {
+    throw "-SkipCommit requires a clean working tree. Commit or stash local changes before using the sync-only path."
+}
+
 if (-not $SkipCommit -and $workingTreeStatus) {
     if ([string]::IsNullOrWhiteSpace($CommitMessage)) {
         throw "Provide -CommitMessage to commit the validated changes before syncing GitHub."
@@ -171,9 +155,11 @@ Assert-LastExitCode "git rev-parse HEAD"
 $remoteHead = (& gh api "repos/$Repository/git/ref/heads/main" --jq ".object.sha").Trim()
 Assert-LastExitCode "gh api git/ref/heads/main"
 
-if ($remoteHead -eq $localHead) {
+$remoteHeadCommit = Get-RemoteGitCommit -RepositoryName $Repository -CommitSha $remoteHead
+
+if ($remoteHead -eq $localHead -or (Test-CommitEquivalence -RepositoryName $Repository -LocalCommitSha $localHead -RemoteCommit $remoteHeadCommit)) {
     Update-EquivalentTrackingRefs -LocalCommitSha $localHead -ActualRemoteSha $remoteHead
-    Write-Step "GitHub main already matches the local HEAD"
+    Write-Step "GitHub main already matches or is content-equivalent to the local HEAD"
     & git status --short --branch
     Assert-LastExitCode "git status --short --branch"
     return
@@ -214,10 +200,8 @@ else {
 $parentSha = (& git rev-parse HEAD^).Trim()
 Assert-LastExitCode "git rev-parse HEAD^"
 
-$remoteHeadCommit = Get-RemoteGitCommit -RepositoryName $Repository -CommitSha $remoteHead
-
 if ($remoteHead -ne $parentSha) {
-    if (-not (Test-CommitEquivalence -LocalCommitSha $parentSha -RemoteCommit $remoteHeadCommit)) {
+    if (-not (Test-CommitEquivalence -RepositoryName $Repository -LocalCommitSha $parentSha -RemoteCommit $remoteHeadCommit)) {
         throw "GitHub main ($remoteHead) is not equivalent to the parent of local HEAD ($parentSha). Aborting API fallback to avoid overwriting remote history."
     }
 
@@ -335,7 +319,7 @@ Assert-LastExitCode "gh api confirm git/ref/heads/main"
 
 $confirmedRemoteCommit = Get-RemoteGitCommit -RepositoryName $Repository -CommitSha $confirmedRemoteHead
 
-if (Test-CommitEquivalence -LocalCommitSha $localHead -RemoteCommit $confirmedRemoteCommit) {
+if (Test-CommitEquivalence -RepositoryName $Repository -LocalCommitSha $localHead -RemoteCommit $confirmedRemoteCommit) {
     Update-EquivalentTrackingRefs -LocalCommitSha $localHead -ActualRemoteSha $confirmedRemoteHead
     Write-Host "Updated local tracking refs using content-equivalent GitHub main $confirmedRemoteHead." -ForegroundColor Green
 }
