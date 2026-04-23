@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <ResolvedVersionCore Condition="'$(ResolvedVersionCore)' == ''">$([System.Text.RegularExpressions.Regex]::Match('$(Version)', '^\d+\.\d+\.\d+').Value)</ResolvedVersionCore>
+    <AssemblyVersion Condition="'$(AssemblyVersion)' == '' and '$(ResolvedVersionCore)' != ''">$([System.Version]::Parse('$(ResolvedVersionCore)').ToString())</AssemblyVersion>
+    <FileVersion Condition="'$(FileVersion)' == '' and '$(ResolvedVersionCore)' != ''">$([System.Version]::Parse('$(ResolvedVersionCore)').ToString())</FileVersion>
+    <InformationalVersion Condition="'$(InformationalVersion)' == '' and '$(Version)' != ''">$(Version)</InformationalVersion>
+  </PropertyGroup>
+</Project>

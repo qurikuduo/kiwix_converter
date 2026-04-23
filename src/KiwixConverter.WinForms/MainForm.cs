@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using KiwixConverter.Core.Infrastructure;
 using KiwixConverter.Core.Models;
 using KiwixConverter.Core.Services;
@@ -10,6 +11,7 @@ public sealed partial class MainForm : Form
     private readonly KiwixAppService _appService = new();
     private readonly NotifyIcon _notifyIcon = new();
     private readonly System.Windows.Forms.Timer _refreshTimer = new() { Interval = 5000 };
+    private readonly Image? _brandLogo = LoadBrandLogo();
 
     private readonly TextBox _kiwixDirectoryTextBox = new() { Dock = DockStyle.Fill };
     private readonly TextBox _defaultOutputDirectoryTextBox = new() { Dock = DockStyle.Fill };
@@ -21,9 +23,7 @@ public sealed partial class MainForm : Form
     private readonly SplitContainer _rootSplitContainer = new()
     {
         Dock = DockStyle.Fill,
-        Orientation = Orientation.Vertical,
-        Panel1MinSize = 420,
-        Panel2MinSize = 600
+        Orientation = Orientation.Vertical
     };
 
     private readonly DataGridView _downloadsGrid = CreateGrid();
@@ -49,61 +49,190 @@ public sealed partial class MainForm : Form
 
     public MainForm()
     {
-        Text = "Kiwix Converter";
-        Width = 1500;
-        Height = 920;
-        MinimumSize = new Size(1200, 760);
-        StartPosition = FormStartPosition.CenterScreen;
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), ".ctor", new
+        {
+            applicationDataDirectory = FileTraceLogger.SummarizePath(AppPaths.ApplicationDataDirectory),
+            logFile = FileTraceLogger.SummarizePath(FileTraceLogger.CurrentLogFilePath)
+        });
 
-        InitializeWeKnoraControls();
-        BuildLayout();
-        WireEvents();
+        try
+        {
+            Text = BuildWindowTitle();
+            Width = 1760;
+            Height = 920;
+            MinimumSize = new Size(1460, 760);
+            StartPosition = FormStartPosition.CenterScreen;
 
-        _notifyIcon.Visible = true;
-        _notifyIcon.Icon = SystemIcons.Information;
-        _notifyIcon.Text = "Kiwix Converter";
+            InitializeWeKnoraControls();
+            FileTraceLogger.Info(nameof(MainForm), "Constructor STEP", new { step = nameof(InitializeWeKnoraControls) });
+
+            ApplyBranding();
+            BuildLayout();
+            WireEvents();
+            FileTraceLogger.Info(nameof(MainForm), "Constructor STEP", new { step = nameof(WireEvents) });
+
+            _notifyIcon.Visible = true;
+            _notifyIcon.Text = "Kiwix Converter";
+
+            scope.Success(new
+            {
+                text = Text,
+                width = Width,
+                height = Height
+            });
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception);
+            throw;
+        }
     }
 
     protected override async void OnShown(EventArgs e)
     {
-        base.OnShown(e);
-        EnsureRootSplitterDistance();
-        await InitializeAsync();
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(OnShown), new
+        {
+            isHandleCreated = IsHandleCreated,
+            visible = Visible
+        });
+
+        try
+        {
+            base.OnShown(e);
+            EnsureRootSplitterDistance();
+            await InitializeAsync();
+            scope.Success(new
+            {
+                splitterDistance = _rootSplitContainer.SplitterDistance,
+                refreshTimerEnabled = _refreshTimer.Enabled
+            });
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception);
+            throw;
+        }
     }
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
-        _notifyIcon.Visible = false;
-        _notifyIcon.Dispose();
-        _refreshTimer.Dispose();
-        base.OnFormClosed(e);
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(OnFormClosed), new
+        {
+            closeReason = e.CloseReason.ToString()
+        });
+
+        try
+        {
+            _notifyIcon.Visible = false;
+            _notifyIcon.Dispose();
+            _refreshTimer.Dispose();
+            _brandLogo?.Dispose();
+            base.OnFormClosed(e);
+            scope.Success();
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception);
+            throw;
+        }
     }
 
     private void BuildLayout()
     {
-        _rootSplitContainer.Panel1.Controls.Add(BuildLeftPanel());
-        _rootSplitContainer.Panel2.Controls.Add(BuildRightPanel());
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(BuildLayout));
 
-        var statusStrip = new StatusStrip();
-        statusStrip.Items.Add(_statusLabel);
+        try
+        {
+            _rootSplitContainer.Panel1.Controls.Add(BuildLeftPanel());
+            _rootSplitContainer.Panel2.Controls.Add(BuildRightPanel());
 
-        Controls.Add(_rootSplitContainer);
-        Controls.Add(statusStrip);
+            var statusStrip = new StatusStrip();
+            statusStrip.Items.Add(_statusLabel);
+
+            Controls.Add(_rootSplitContainer);
+            Controls.Add(statusStrip);
+
+            scope.Success(new
+            {
+                rootControls = Controls.Count,
+                leftPanelControls = _rootSplitContainer.Panel1.Controls.Count,
+                rightPanelControls = _rootSplitContainer.Panel2.Controls.Count
+            });
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception);
+            throw;
+        }
+    }
+
+    private void ApplyBranding()
+    {
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(ApplyBranding), new
+        {
+            executablePath = FileTraceLogger.SummarizePath(Application.ExecutablePath)
+        });
+
+        try
+        {
+            using var extractedIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            if (extractedIcon is not null)
+            {
+                Icon = (Icon)extractedIcon.Clone();
+                _notifyIcon.Icon = (Icon)extractedIcon.Clone();
+                scope.Success(new { iconSource = "Application.ExecutablePath" });
+                return;
+            }
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception, new { fallbackIcon = "SystemIcons.Information" });
+            _notifyIcon.Icon = SystemIcons.Information;
+            return;
+        }
+
+        _notifyIcon.Icon = SystemIcons.Information;
+        scope.Success(new { iconSource = "SystemIcons.Information" });
     }
 
     private void EnsureRootSplitterDistance()
     {
+        const int desiredPanel1MinSize = 420;
+        const int desiredPanel2MinSize = 600;
+
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(EnsureRootSplitterDistance), new
+        {
+            width = _rootSplitContainer.Width,
+            panel1MinSize = desiredPanel1MinSize,
+            panel2MinSize = desiredPanel2MinSize
+        });
+
+        _rootSplitContainer.Panel1MinSize = desiredPanel1MinSize;
+        _rootSplitContainer.Panel2MinSize = desiredPanel2MinSize;
+
         var maxSplitterDistance = _rootSplitContainer.Width - _rootSplitContainer.Panel2MinSize;
         if (maxSplitterDistance < _rootSplitContainer.Panel1MinSize)
         {
+            scope.Success(new
+            {
+                skipped = true,
+                maxSplitterDistance
+            });
             return;
         }
 
-        var desiredSplitterDistance = Math.Max(_rootSplitContainer.Panel1MinSize, Math.Min(520, maxSplitterDistance));
+        var desiredSplitterDistance = Math.Max(_rootSplitContainer.Panel1MinSize, Math.Min(680, maxSplitterDistance));
         if (_rootSplitContainer.SplitterDistance != desiredSplitterDistance)
         {
             _rootSplitContainer.SplitterDistance = desiredSplitterDistance;
         }
+
+        scope.Success(new
+        {
+            skipped = false,
+            maxSplitterDistance,
+            splitterDistance = _rootSplitContainer.SplitterDistance
+        });
     }
 
     private Control BuildLeftPanel()
@@ -112,19 +241,191 @@ public sealed partial class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 4,
+            RowCount = 5,
             Padding = new Padding(8)
         };
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-        layout.Controls.Add(BuildSettingsGroup(), 0, 0);
-        layout.Controls.Add(BuildWeKnoraSettingsGroup(), 0, 1);
-        layout.Controls.Add(BuildConversionGroup(), 0, 2);
-        layout.Controls.Add(BuildDownloadsGroup(), 0, 3);
+        layout.Controls.Add(BuildBrandHeader(), 0, 0);
+        layout.Controls.Add(BuildSettingsGroup(), 0, 1);
+        layout.Controls.Add(BuildWeKnoraSettingsGroup(), 0, 2);
+        layout.Controls.Add(BuildConversionGroup(), 0, 3);
+        layout.Controls.Add(BuildDownloadsGroup(), 0, 4);
         return layout;
+    }
+
+    private Control BuildBrandHeader()
+    {
+        var panel = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 128,
+            Padding = new Padding(12, 10, 12, 10),
+            Margin = new Padding(0, 0, 0, 6),
+            BorderStyle = BorderStyle.FixedSingle,
+            BackColor = Color.FromArgb(244, 249, 250)
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 3,
+            BackColor = Color.Transparent,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 102));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var brandImage = CreateBrandSymbolImage();
+        if (brandImage is not null)
+        {
+            var pictureBox = new PictureBox
+            {
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 0, 12, 0),
+                SizeMode = PictureBoxSizeMode.Zoom,
+                Image = brandImage
+            };
+            layout.Controls.Add(pictureBox, 0, 0);
+            layout.SetRowSpan(pictureBox, 3);
+        }
+
+        layout.Controls.Add(new Label
+        {
+            AutoSize = true,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 6, 0, 0),
+            Text = "Kiwix Converter",
+            TextAlign = ContentAlignment.BottomLeft,
+            Font = new Font("Segoe UI Semibold", 20f, FontStyle.Bold),
+            ForeColor = Color.FromArgb(15, 57, 70)
+        }, 1, 0);
+
+        layout.Controls.Add(new Label
+        {
+            AutoSize = true,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 4, 0, 0),
+            Text = "ZIM to Markdown, RAG artifacts, and WeKnora sync",
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = new Font("Segoe UI", 10.5f, FontStyle.Regular),
+            ForeColor = Color.FromArgb(47, 87, 99)
+        }, 1, 1);
+
+        layout.Controls.Add(new Label
+        {
+            AutoSize = true,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 8, 0, 0),
+            Text = $"Version {GetDisplayVersion()}",
+            TextAlign = ContentAlignment.TopLeft,
+            Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold),
+            ForeColor = Color.FromArgb(103, 128, 138)
+        }, 1, 2);
+
+        panel.Controls.Add(layout);
+
+        return panel;
+    }
+
+    private Image? CreateBrandSymbolImage()
+    {
+        if (Icon is not null)
+        {
+            return Icon.ToBitmap();
+        }
+
+        if (_brandLogo is null)
+        {
+            return null;
+        }
+
+        var cropSize = Math.Min(_brandLogo.Width, _brandLogo.Height);
+        var bitmap = new Bitmap(cropSize, cropSize);
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.DrawImage(
+            _brandLogo,
+            new Rectangle(0, 0, cropSize, cropSize),
+            new Rectangle(0, 0, cropSize, cropSize),
+            GraphicsUnit.Pixel);
+        return bitmap;
+    }
+
+    private static string BuildWindowTitle()
+    {
+        var version = GetDisplayVersion();
+        return string.IsNullOrWhiteSpace(version)
+            ? "Kiwix Converter"
+            : $"Kiwix Converter v{version}";
+    }
+
+    private static string GetDisplayVersion()
+    {
+        var version = Application.ProductVersion;
+        if (string.IsNullOrWhiteSpace(version))
+        {
+            version = Assembly.GetExecutingAssembly()
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+                .InformationalVersion;
+        }
+
+        if (string.IsNullOrWhiteSpace(version))
+        {
+            version = Assembly.GetExecutingAssembly().GetName().Version?.ToString();
+        }
+
+        if (string.IsNullOrWhiteSpace(version))
+        {
+            return string.Empty;
+        }
+
+        var separatorIndex = version.IndexOf('+');
+        return (separatorIndex >= 0 ? version[..separatorIndex] : version).Trim();
+    }
+
+    private static Image? LoadBrandLogo()
+    {
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(LoadBrandLogo), new
+        {
+            resourceName = "KiwixConverter.WinForms.Resources.AppLogo.png"
+        });
+
+        try
+        {
+            using var resourceStream = typeof(MainForm).Assembly.GetManifestResourceStream("KiwixConverter.WinForms.Resources.AppLogo.png");
+            if (resourceStream is null)
+            {
+                scope.Success(new { loaded = false });
+                return null;
+            }
+
+            using var buffer = new MemoryStream();
+            resourceStream.CopyTo(buffer);
+            buffer.Position = 0;
+            using var image = Image.FromStream(buffer);
+            var bitmap = new Bitmap(image);
+            scope.Success(new
+            {
+                loaded = true,
+                width = bitmap.Width,
+                height = bitmap.Height
+            });
+            return bitmap;
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception);
+            throw;
+        }
     }
 
     private Control BuildSettingsGroup()
@@ -141,18 +442,18 @@ public sealed partial class MainForm : Form
         {
             Dock = DockStyle.Top,
             ColumnCount = 3,
-            RowCount = 5,
+            RowCount = 8,
             AutoSize = true,
             Padding = new Padding(8)
         };
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        AddLabeledRow(table, 0, "kiwix-desktop", _kiwixDirectoryTextBox, CreateButton("Browse...", (_, _) => BrowseForFolder(_kiwixDirectoryTextBox)));
-        AddLabeledRow(table, 1, "Default Output", _defaultOutputDirectoryTextBox, CreateButton("Browse...", (_, _) => BrowseForFolder(_defaultOutputDirectoryTextBox)));
-        AddLabeledRow(table, 2, "zimdump Path", _zimdumpPathTextBox, CreateButton("Browse...", (_, _) => BrowseForExecutable()));
-        AddLabeledRow(table, 3, "Snapshot Seconds", _snapshotIntervalUpDown, new Label { Text = "Article-level checkpoints + periodic task snapshots", AutoSize = true, Anchor = AnchorStyles.Left });
+        AddStackedInputRow(table, 0, "kiwix-desktop", _kiwixDirectoryTextBox, CreateButton("Browse...", (_, _) => BrowseForFolder(_kiwixDirectoryTextBox)));
+        AddStackedInputRow(table, 2, "Default Output", _defaultOutputDirectoryTextBox, CreateButton("Browse...", (_, _) => BrowseForFolder(_defaultOutputDirectoryTextBox)));
+        AddStackedInputRow(table, 4, "zimdump Path", _zimdumpPathTextBox, CreateButton("Browse...", (_, _) => BrowseForExecutable()));
+        AddLabeledRow(table, 6, "Snapshot Seconds", _snapshotIntervalUpDown, new Label { Text = "Article-level checkpoints + periodic task snapshots", AutoSize = true, Anchor = AnchorStyles.Left });
 
         var buttonPanel = new FlowLayoutPanel
         {
@@ -164,7 +465,7 @@ public sealed partial class MainForm : Form
         };
         buttonPanel.Controls.Add(_saveSettingsButton);
         buttonPanel.Controls.Add(_scanButton);
-        table.Controls.Add(buttonPanel, 1, 4);
+        table.Controls.Add(buttonPanel, 1, 7);
         table.SetColumnSpan(buttonPanel, 2);
 
         group.Controls.Add(table);
@@ -185,15 +486,15 @@ public sealed partial class MainForm : Form
         {
             Dock = DockStyle.Top,
             ColumnCount = 3,
-            RowCount = 2,
+            RowCount = 3,
             AutoSize = true,
             Padding = new Padding(8)
         };
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        AddLabeledRow(table, 0, "Output Override", _taskOutputOverrideTextBox, CreateButton("Browse...", (_, _) => BrowseForFolder(_taskOutputOverrideTextBox)));
+        AddStackedInputRow(table, 0, "Output Override", _taskOutputOverrideTextBox, CreateButton("Browse...", (_, _) => BrowseForFolder(_taskOutputOverrideTextBox)));
 
         var helperLabel = new Label
         {
@@ -202,8 +503,8 @@ public sealed partial class MainForm : Form
             AutoSize = true,
             MaximumSize = new Size(420, 0)
         };
-        table.Controls.Add(helperLabel, 1, 1);
-        table.Controls.Add(_convertButton, 2, 1);
+        table.Controls.Add(helperLabel, 1, 2);
+        table.Controls.Add(_convertButton, 2, 2);
 
         group.Controls.Add(table);
         return group;
@@ -372,13 +673,24 @@ public sealed partial class MainForm : Form
 
     private async Task InitializeAsync()
     {
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(InitializeAsync), new
+        {
+            logFile = FileTraceLogger.SummarizePath(FileTraceLogger.CurrentLogFilePath)
+        });
+
         try
         {
             SetStatus("Initializing application state...");
             await _appService.InitializeAsync();
+            FileTraceLogger.Info(nameof(MainForm), "InitializeAsync STEP", new { step = "AppService.InitializeAsync completed" });
             await LoadSettingsIntoFormAsync();
             if (!await EnsureRequiredDirectoriesConfiguredAsync())
             {
+                scope.Success(new
+                {
+                    ready = false,
+                    reason = "Required directories missing"
+                });
                 return;
             }
 
@@ -388,40 +700,67 @@ public sealed partial class MainForm : Form
             await TryLoadWeKnoraKnowledgeBasesAsync();
             _refreshTimer.Start();
             SetStatus("Ready.");
+            scope.Success(new
+            {
+                ready = true,
+                refreshTimerEnabled = _refreshTimer.Enabled
+            });
         }
         catch (Exception exception)
         {
             var startupLogPath = Path.Combine(AppPaths.ApplicationDataDirectory, "startup-error.log");
             File.WriteAllText(startupLogPath, exception.ToString());
             SetStatus($"Initialization failed. See {startupLogPath} for details.");
+            scope.Fail(exception, new
+            {
+                startupErrorLog = FileTraceLogger.SummarizePath(startupLogPath)
+            });
         }
     }
 
     private async Task LoadSettingsIntoFormAsync()
     {
-        var settings = await _appService.GetSettingsAsync();
-        _kiwixDirectoryTextBox.Text = settings.KiwixDesktopDirectory ?? string.Empty;
-        _defaultOutputDirectoryTextBox.Text = settings.DefaultOutputDirectory ?? string.Empty;
-        _zimdumpPathTextBox.Text = settings.ZimdumpExecutablePath ?? string.Empty;
-        _snapshotIntervalUpDown.Value = Math.Min(_snapshotIntervalUpDown.Maximum, Math.Max(_snapshotIntervalUpDown.Minimum, settings.SnapshotIntervalSeconds));
-        _weKnoraBaseUrlTextBox.Text = settings.WeKnoraBaseUrl ?? string.Empty;
-        _weKnoraAccessTokenTextBox.Text = settings.WeKnoraAccessToken ?? string.Empty;
-        _weKnoraKnowledgeBaseIdTextBox.Text = settings.WeKnoraKnowledgeBaseId ?? string.Empty;
-        _weKnoraKnowledgeBaseNameTextBox.Text = settings.WeKnoraKnowledgeBaseName ?? string.Empty;
-        _weKnoraKnowledgeBaseDescriptionTextBox.Text = settings.WeKnoraKnowledgeBaseDescription ?? string.Empty;
-        _weKnoraChatModelIdComboBox.Text = settings.WeKnoraChatModelId ?? string.Empty;
-        _weKnoraEmbeddingModelIdComboBox.Text = settings.WeKnoraEmbeddingModelId ?? string.Empty;
-        _weKnoraMultimodalModelIdComboBox.Text = settings.WeKnoraMultimodalModelId ?? string.Empty;
-        _weKnoraChunkSizeUpDown.Value = Math.Max(_weKnoraChunkSizeUpDown.Minimum, Math.Min(_weKnoraChunkSizeUpDown.Maximum, settings.WeKnoraChunkSize));
-        _weKnoraChunkOverlapUpDown.Value = Math.Max(_weKnoraChunkOverlapUpDown.Minimum, Math.Min(_weKnoraChunkOverlapUpDown.Maximum, settings.WeKnoraChunkOverlap));
-        _weKnoraEnableParentChildCheckBox.Checked = settings.WeKnoraEnableParentChild;
-        _weKnoraAuthModeComboBox.SelectedItem = settings.WeKnoraAuthMode.ToString();
-        _weKnoraAutoCreateKnowledgeBaseCheckBox.Checked = settings.WeKnoraAutoCreateKnowledgeBase;
-        _weKnoraAppendMetadataCheckBox.Checked = settings.WeKnoraAppendMetadataBlock;
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(LoadSettingsIntoFormAsync));
+
+        try
+        {
+            var settings = await _appService.GetSettingsAsync();
+            _kiwixDirectoryTextBox.Text = settings.KiwixDesktopDirectory ?? string.Empty;
+            _defaultOutputDirectoryTextBox.Text = settings.DefaultOutputDirectory ?? string.Empty;
+            _zimdumpPathTextBox.Text = settings.ZimdumpExecutablePath ?? string.Empty;
+            _snapshotIntervalUpDown.Value = Math.Min(_snapshotIntervalUpDown.Maximum, Math.Max(_snapshotIntervalUpDown.Minimum, settings.SnapshotIntervalSeconds));
+            _weKnoraBaseUrlTextBox.Text = settings.WeKnoraBaseUrl ?? string.Empty;
+            _weKnoraAccessTokenTextBox.Text = settings.WeKnoraAccessToken ?? string.Empty;
+            _weKnoraKnowledgeBaseIdTextBox.Text = settings.WeKnoraKnowledgeBaseId ?? string.Empty;
+            _weKnoraKnowledgeBaseNameTextBox.Text = settings.WeKnoraKnowledgeBaseName ?? string.Empty;
+            _weKnoraKnowledgeBaseDescriptionTextBox.Text = settings.WeKnoraKnowledgeBaseDescription ?? string.Empty;
+            _weKnoraChatModelIdComboBox.Text = settings.WeKnoraChatModelId ?? string.Empty;
+            _weKnoraEmbeddingModelIdComboBox.Text = settings.WeKnoraEmbeddingModelId ?? string.Empty;
+            _weKnoraMultimodalModelIdComboBox.Text = settings.WeKnoraMultimodalModelId ?? string.Empty;
+            _weKnoraChunkSizeUpDown.Value = Math.Max(_weKnoraChunkSizeUpDown.Minimum, Math.Min(_weKnoraChunkSizeUpDown.Maximum, settings.WeKnoraChunkSize));
+            _weKnoraChunkOverlapUpDown.Value = Math.Max(_weKnoraChunkOverlapUpDown.Minimum, Math.Min(_weKnoraChunkOverlapUpDown.Maximum, settings.WeKnoraChunkOverlap));
+            _weKnoraEnableParentChildCheckBox.Checked = settings.WeKnoraEnableParentChild;
+            _weKnoraAuthModeComboBox.SelectedItem = settings.WeKnoraAuthMode.ToString();
+            _weKnoraAutoCreateKnowledgeBaseCheckBox.Checked = settings.WeKnoraAutoCreateKnowledgeBase;
+            _weKnoraAppendMetadataCheckBox.Checked = settings.WeKnoraAppendMetadataBlock;
+
+            scope.Success(SummarizeAppSettings(settings));
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception);
+            throw;
+        }
     }
 
     private async Task<bool> EnsureRequiredDirectoriesConfiguredAsync()
     {
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(EnsureRequiredDirectoriesConfiguredAsync), new
+        {
+            kiwixDirectory = FileTraceLogger.SummarizePath(_kiwixDirectoryTextBox.Text),
+            defaultOutputDirectory = FileTraceLogger.SummarizePath(_defaultOutputDirectoryTextBox.Text)
+        });
+
         var missingDirectories = new List<string>();
 
         if (!Directory.Exists(_kiwixDirectoryTextBox.Text))
@@ -437,15 +776,23 @@ public sealed partial class MainForm : Form
         if (missingDirectories.Count > 0)
         {
             SetStatus($"Configure {string.Join(" and ", missingDirectories)} before scanning or converting.");
+            scope.Success(new
+            {
+                configured = false,
+                missingDirectories
+            });
             return false;
         }
 
         await SaveSettingsAsync(silent: true);
+        scope.Success(new { configured = true });
         return true;
     }
 
     private async Task SaveSettingsAsync(bool silent = false)
     {
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(SaveSettingsAsync), new { silent });
+
         var settings = new AppSettings
         {
             KiwixDesktopDirectory = string.IsNullOrWhiteSpace(_kiwixDirectoryTextBox.Text) ? null : _kiwixDirectoryTextBox.Text.Trim(),
@@ -468,26 +815,121 @@ public sealed partial class MainForm : Form
             WeKnoraAppendMetadataBlock = _weKnoraAppendMetadataCheckBox.Checked
         };
 
-        await _appService.SaveSettingsAsync(settings);
-        if (!silent)
+        try
         {
-            SetStatus("Settings saved.");
+            await _appService.SaveSettingsAsync(settings);
+            if (!silent)
+            {
+                SetStatus("Settings saved.");
+            }
+
+            scope.Success(SummarizeAppSettings(settings));
         }
+        catch (Exception exception)
+        {
+            scope.Fail(exception, CaptureCurrentSettingsInput());
+            throw;
+        }
+    }
+
+    private object CaptureCurrentSettingsInput()
+    {
+        return new
+        {
+            kiwixDirectory = FileTraceLogger.SummarizePath(_kiwixDirectoryTextBox.Text),
+            defaultOutputDirectory = FileTraceLogger.SummarizePath(_defaultOutputDirectoryTextBox.Text),
+            zimdumpExecutablePath = FileTraceLogger.SummarizePath(_zimdumpPathTextBox.Text),
+            snapshotIntervalSeconds = (int)_snapshotIntervalUpDown.Value,
+            weKnoraBaseUrl = FileTraceLogger.SummarizeText(_weKnoraBaseUrlTextBox.Text, 240),
+            weKnoraAccessToken = FileTraceLogger.RedactSecret(_weKnoraAccessTokenTextBox.Text),
+            weKnoraKnowledgeBaseId = FileTraceLogger.SummarizeText(_weKnoraKnowledgeBaseIdTextBox.Text),
+            weKnoraKnowledgeBaseName = FileTraceLogger.SummarizeText(_weKnoraKnowledgeBaseNameTextBox.Text),
+            weKnoraKnowledgeBaseDescription = FileTraceLogger.SummarizeText(_weKnoraKnowledgeBaseDescriptionTextBox.Text, 240),
+            weKnoraChatModelId = FileTraceLogger.SummarizeText(GetWeKnoraModelSelection(_weKnoraChatModelIdComboBox)),
+            weKnoraEmbeddingModelId = FileTraceLogger.SummarizeText(GetWeKnoraModelSelection(_weKnoraEmbeddingModelIdComboBox)),
+            weKnoraMultimodalModelId = FileTraceLogger.SummarizeText(GetWeKnoraModelSelection(_weKnoraMultimodalModelIdComboBox)),
+            weKnoraChunkSize = (int)_weKnoraChunkSizeUpDown.Value,
+            weKnoraChunkOverlap = (int)_weKnoraChunkOverlapUpDown.Value,
+            weKnoraEnableParentChild = _weKnoraEnableParentChildCheckBox.Checked,
+            weKnoraAuthMode = _weKnoraAuthModeComboBox.SelectedItem?.ToString(),
+            weKnoraAutoCreateKnowledgeBase = _weKnoraAutoCreateKnowledgeBaseCheckBox.Checked,
+            weKnoraAppendMetadataBlock = _weKnoraAppendMetadataCheckBox.Checked
+        };
+    }
+
+    private static object SummarizeAppSettings(AppSettings settings)
+    {
+        return new
+        {
+            kiwixDirectory = FileTraceLogger.SummarizePath(settings.KiwixDesktopDirectory),
+            defaultOutputDirectory = FileTraceLogger.SummarizePath(settings.DefaultOutputDirectory),
+            zimdumpExecutablePath = FileTraceLogger.SummarizePath(settings.ZimdumpExecutablePath),
+            snapshotIntervalSeconds = settings.SnapshotIntervalSeconds,
+            weKnoraBaseUrl = FileTraceLogger.SummarizeText(settings.WeKnoraBaseUrl, 240),
+            weKnoraAccessToken = FileTraceLogger.RedactSecret(settings.WeKnoraAccessToken),
+            weKnoraKnowledgeBaseId = FileTraceLogger.SummarizeText(settings.WeKnoraKnowledgeBaseId),
+            weKnoraKnowledgeBaseName = FileTraceLogger.SummarizeText(settings.WeKnoraKnowledgeBaseName),
+            weKnoraKnowledgeBaseDescription = FileTraceLogger.SummarizeText(settings.WeKnoraKnowledgeBaseDescription, 240),
+            weKnoraChatModelId = FileTraceLogger.SummarizeText(settings.WeKnoraChatModelId),
+            weKnoraEmbeddingModelId = FileTraceLogger.SummarizeText(settings.WeKnoraEmbeddingModelId),
+            weKnoraMultimodalModelId = FileTraceLogger.SummarizeText(settings.WeKnoraMultimodalModelId),
+            weKnoraChunkSize = settings.WeKnoraChunkSize,
+            weKnoraChunkOverlap = settings.WeKnoraChunkOverlap,
+            weKnoraEnableParentChild = settings.WeKnoraEnableParentChild,
+            weKnoraAuthMode = settings.WeKnoraAuthMode.ToString(),
+            weKnoraAutoCreateKnowledgeBase = settings.WeKnoraAutoCreateKnowledgeBase,
+            weKnoraAppendMetadataBlock = settings.WeKnoraAppendMetadataBlock
+        };
+    }
+
+    private static object SummarizeToolAvailability(ToolAvailabilityResult availability)
+    {
+        return new
+        {
+            availability.IsAvailable,
+            resolvedPath = FileTraceLogger.SummarizePath(availability.ResolvedPath),
+            version = FileTraceLogger.SummarizeText(availability.Version, 240),
+            message = FileTraceLogger.SummarizeText(availability.Message, 320)
+        };
     }
 
     private async Task ScanAndRefreshAsync(bool initialLoad = false)
     {
-        await SaveSettingsAsync(silent: true);
-        SetStatus("Scanning the configured kiwix-desktop directory...");
-        await _appService.ScanAsync();
-        await RefreshAllViewsAsync(initialLoad);
-        SetStatus("ZIM scan completed.");
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(ScanAndRefreshAsync), new { initialLoad });
+
+        try
+        {
+            await SaveSettingsAsync(silent: true);
+            SetStatus("Scanning the configured kiwix-desktop directory...");
+            await _appService.ScanAsync();
+            await RefreshAllViewsAsync(initialLoad);
+            SetStatus("ZIM scan completed.");
+            scope.Success(new { initialLoad });
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception, new { initialLoad });
+            throw;
+        }
     }
 
     private async Task RefreshAllViewsAsync(bool initialLoad = false)
     {
+        var shouldTrace = initialLoad || !_refreshTimer.Enabled;
+        FileTraceLogger.TraceScope? scope = null;
+        if (shouldTrace)
+        {
+            scope = FileTraceLogger.Enter(nameof(MainForm), nameof(RefreshAllViewsAsync), new { initialLoad, isRefreshing = _isRefreshing, isDisposed = IsDisposed });
+        }
+
         if (_isRefreshing || IsDisposed)
         {
+            if (shouldTrace)
+            {
+                FileTraceLogger.Info(nameof(MainForm), "RefreshAllViewsAsync SKIP", new { initialLoad, isRefreshing = _isRefreshing, isDisposed = IsDisposed });
+                scope?.Success(new { skipped = true });
+            }
+
             return;
         }
 
@@ -574,10 +1016,25 @@ public sealed partial class MainForm : Form
             {
                 NotifyNewCompletedTasks(tasks);
             }
+
+            if (shouldTrace)
+            {
+                scope?.Success(new
+                {
+                    skipped = false,
+                    downloads = downloads.Count,
+                    tasks = tasks.Count,
+                    history = history.Count,
+                    logs = logs.Count,
+                    syncTasks = syncTasks.Count,
+                    syncLogs = syncLogs.Count
+                });
+            }
         }
         catch (Exception exception)
         {
             SetStatus("Refresh failed.");
+            scope?.Fail(exception, new { initialLoad });
             MessageBox.Show(this, exception.Message, "Refresh Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
@@ -651,8 +1108,15 @@ public sealed partial class MainForm : Form
 
     private async void OnMainFormClosingAsync(object? sender, FormClosingEventArgs e)
     {
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(OnMainFormClosingAsync), new
+        {
+            e.CloseReason,
+            allowClose = _allowClose
+        });
+
         if (_allowClose)
         {
+            scope.Success(new { skipped = true, reason = "_allowClose already true" });
             return;
         }
 
@@ -671,6 +1135,7 @@ public sealed partial class MainForm : Form
 
         _allowClose = true;
         Close();
+        scope.Success(new { skipped = false, allowClose = _allowClose });
     }
 
     private long? GetSelectedDownloadId()
@@ -727,6 +1192,29 @@ public sealed partial class MainForm : Form
         table.Controls.Add(new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left }, 0, rowIndex);
         table.Controls.Add(control, 1, rowIndex);
         table.Controls.Add(accessory, 2, rowIndex);
+    }
+
+    private static void AddStackedInputRow(TableLayoutPanel table, int rowIndex, string label, Control control, Control accessory)
+    {
+        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        var labelControl = new Label
+        {
+            Text = label,
+            AutoSize = true,
+            Anchor = AnchorStyles.Left,
+            Margin = new Padding(3, 3, 3, 0)
+        };
+
+        control.Margin = new Padding(3, 3, 6, 3);
+        accessory.Anchor = AnchorStyles.Left;
+
+        table.Controls.Add(labelControl, 0, rowIndex);
+        table.SetColumnSpan(labelControl, 3);
+        table.Controls.Add(control, 0, rowIndex + 1);
+        table.SetColumnSpan(control, 2);
+        table.Controls.Add(accessory, 2, rowIndex + 1);
     }
 
     private static Button CreateButton(string text, EventHandler onClick)

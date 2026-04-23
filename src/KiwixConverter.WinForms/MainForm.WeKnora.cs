@@ -1,3 +1,4 @@
+using KiwixConverter.Core.Infrastructure;
 using KiwixConverter.Core.Models;
 
 namespace KiwixConverter.WinForms;
@@ -83,7 +84,7 @@ public sealed partial class MainForm
             AutoSize = true,
             Padding = new Padding(8)
         };
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
@@ -302,44 +303,89 @@ public sealed partial class MainForm
 
     private async Task EnsureZimdumpAvailableAsync()
     {
-        var availability = await _appService.GetZimdumpAvailabilityAsync();
-        if (availability.IsAvailable)
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(EnsureZimdumpAvailableAsync), new
         {
-            SetStatus($"zimdump ready: {availability.Version}");
-            return;
-        }
+            configuredPath = FileTraceLogger.SummarizePath(_zimdumpPathTextBox.Text)
+        });
 
-        var result = MessageBox.Show(
-            this,
-            $"zimdump was not detected.\n\nCurrent check result: {availability.Message}\n\nTo fix this:\n1. Install zimdump from the openZIM zim-tools package.\n2. Add the folder containing zimdump.exe to PATH, or browse directly to zimdump.exe below.\n3. Save settings and retry.\n\nChoose Yes to locate zimdump.exe now, or No to continue with limited functionality.",
-            "zimdump Not Found",
-            MessageBoxButtons.YesNo,
-            MessageBoxIcon.Warning);
-
-        if (result != DialogResult.Yes)
+        try
         {
-            SetStatus("zimdump not configured. Conversion and metadata extraction will stay unavailable until it is configured.");
-            return;
+            var availability = await _appService.GetZimdumpAvailabilityAsync();
+            if (availability.IsAvailable)
+            {
+                SetStatus($"zimdump ready: {availability.Version}");
+                scope.Success(SummarizeToolAvailability(availability));
+                return;
+            }
+
+            var result = MessageBox.Show(
+                this,
+                $"zimdump was not detected.\n\nCurrent check result: {availability.Message}\n\nTo fix this:\n1. Install zimdump from the openZIM zim-tools package.\n2. Add the folder containing zimdump.exe to PATH, or browse directly to zimdump.exe below.\n3. Save settings and retry.\n\nChoose Yes to locate zimdump.exe now, or No to continue with limited functionality.",
+                "zimdump Not Found",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+
+            FileTraceLogger.Warning(nameof(MainForm), "EnsureZimdumpAvailableAsync USER_DECISION", new
+            {
+                availability = SummarizeToolAvailability(availability),
+                decision = result.ToString()
+            });
+
+            if (result != DialogResult.Yes)
+            {
+                SetStatus("zimdump not configured. Conversion and metadata extraction will stay unavailable until it is configured.");
+                scope.Success(new
+                {
+                    availability = SummarizeToolAvailability(availability),
+                    userChoseToBrowse = false
+                });
+                return;
+            }
+
+            BrowseForExecutable();
+            await SaveSettingsAsync(silent: true);
+
+            var retryAvailability = await _appService.GetZimdumpAvailabilityAsync();
+            if (retryAvailability.IsAvailable)
+            {
+                SetStatus($"zimdump ready: {retryAvailability.Version}");
+                scope.Success(new
+                {
+                    availability = SummarizeToolAvailability(retryAvailability),
+                    userChoseToBrowse = true
+                });
+                return;
+            }
+
+            MessageBox.Show(this, retryAvailability.Message ?? "zimdump is still unavailable.", "zimdump Check Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            SetStatus("zimdump still not configured. Please correct the path or PATH environment variable.");
+            scope.Success(new
+            {
+                availability = SummarizeToolAvailability(retryAvailability),
+                userChoseToBrowse = true
+            });
         }
-
-        BrowseForExecutable();
-        await SaveSettingsAsync(silent: true);
-
-        var retryAvailability = await _appService.GetZimdumpAvailabilityAsync();
-        if (retryAvailability.IsAvailable)
+        catch (Exception exception)
         {
-            SetStatus($"zimdump ready: {retryAvailability.Version}");
-            return;
+            scope.Fail(exception, new
+            {
+                configuredPath = FileTraceLogger.SummarizePath(_zimdumpPathTextBox.Text)
+            });
+            throw;
         }
-
-        MessageBox.Show(this, retryAvailability.Message ?? "zimdump is still unavailable.", "zimdump Check Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        SetStatus("zimdump still not configured. Please correct the path or PATH environment variable.");
     }
 
     private async Task TryLoadWeKnoraKnowledgeBasesAsync()
     {
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(TryLoadWeKnoraKnowledgeBasesAsync), new
+        {
+            weKnoraBaseUrl = FileTraceLogger.SummarizeText(_weKnoraBaseUrlTextBox.Text, 240),
+            weKnoraAccessToken = FileTraceLogger.RedactSecret(_weKnoraAccessTokenTextBox.Text)
+        });
+
         if (string.IsNullOrWhiteSpace(_weKnoraBaseUrlTextBox.Text) || string.IsNullOrWhiteSpace(_weKnoraAccessTokenTextBox.Text))
         {
+            scope.Success(new { skipped = true, reason = "Missing base URL or access token" });
             return;
         }
 
@@ -347,47 +393,101 @@ public sealed partial class MainForm
         {
             await LoadWeKnoraKnowledgeBasesAsync(silent: true);
             await LoadWeKnoraModelsAsync(silent: true);
+            scope.Success(new { skipped = false });
         }
-        catch
+        catch (Exception exception)
         {
+            scope.Fail(exception);
         }
     }
 
     private async Task TestWeKnoraConnectionAsync()
     {
-        await SaveSettingsAsync(silent: true);
-        var result = await _appService.TestWeKnoraConnectionAsync();
-        var icon = result.IsAvailable ? MessageBoxIcon.Information : MessageBoxIcon.Warning;
-        MessageBox.Show(this, result.Message ?? "No response received.", result.IsAvailable ? "WeKnora Connection OK" : "WeKnora Connection Failed", MessageBoxButtons.OK, icon);
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(TestWeKnoraConnectionAsync), CaptureCurrentSettingsInput());
 
-        if (result.IsAvailable)
+        try
         {
-            await LoadWeKnoraKnowledgeBasesAsync(silent: true);
-            await LoadWeKnoraModelsAsync(silent: true);
+            await SaveSettingsAsync(silent: true);
+            var result = await _appService.TestWeKnoraConnectionAsync();
+            var icon = result.IsAvailable ? MessageBoxIcon.Information : MessageBoxIcon.Warning;
+            MessageBox.Show(this, result.Message ?? "No response received.", result.IsAvailable ? "WeKnora Connection OK" : "WeKnora Connection Failed", MessageBoxButtons.OK, icon);
+
+            if (result.IsAvailable)
+            {
+                await LoadWeKnoraKnowledgeBasesAsync(silent: true);
+                await LoadWeKnoraModelsAsync(silent: true);
+            }
+
+            scope.Success(new
+            {
+                result.IsAvailable,
+                message = FileTraceLogger.SummarizeText(result.Message, 320)
+            });
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception);
+            throw;
         }
     }
 
     private async Task LoadWeKnoraKnowledgeBasesAsync(bool silent = false)
     {
-        await SaveSettingsAsync(silent: true);
-        var knowledgeBases = await _appService.GetWeKnoraKnowledgeBasesAsync();
-        PopulateKnowledgeBaseChoices(knowledgeBases);
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(LoadWeKnoraKnowledgeBasesAsync), new { silent });
 
-        if (!silent)
+        try
         {
-            SetStatus($"Loaded {knowledgeBases.Count} WeKnora knowledge base(s).");
+            await SaveSettingsAsync(silent: true);
+            var knowledgeBases = await _appService.GetWeKnoraKnowledgeBasesAsync();
+            PopulateKnowledgeBaseChoices(knowledgeBases);
+
+            if (!silent)
+            {
+                SetStatus($"Loaded {knowledgeBases.Count} WeKnora knowledge base(s).");
+            }
+
+            scope.Success(new
+            {
+                silent,
+                knowledgeBaseCount = knowledgeBases.Count,
+                selectedKnowledgeBaseId = FileTraceLogger.SummarizeText(_weKnoraKnowledgeBaseIdTextBox.Text)
+            });
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception, new { silent });
+            throw;
         }
     }
 
     private async Task LoadWeKnoraModelsAsync(bool silent = false)
     {
-        await SaveSettingsAsync(silent: true);
-        var models = await _appService.GetWeKnoraModelsAsync();
-        PopulateWeKnoraModelChoices(models);
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(LoadWeKnoraModelsAsync), new { silent });
 
-        if (!silent)
+        try
         {
-            SetStatus($"Loaded {models.Count} WeKnora model(s).");
+            await SaveSettingsAsync(silent: true);
+            var models = await _appService.GetWeKnoraModelsAsync();
+            PopulateWeKnoraModelChoices(models);
+
+            if (!silent)
+            {
+                SetStatus($"Loaded {models.Count} WeKnora model(s).");
+            }
+
+            scope.Success(new
+            {
+                silent,
+                modelCount = models.Count,
+                selectedChatModelId = FileTraceLogger.SummarizeText(GetWeKnoraModelSelection(_weKnoraChatModelIdComboBox)),
+                selectedEmbeddingModelId = FileTraceLogger.SummarizeText(GetWeKnoraModelSelection(_weKnoraEmbeddingModelIdComboBox)),
+                selectedMultimodalModelId = FileTraceLogger.SummarizeText(GetWeKnoraModelSelection(_weKnoraMultimodalModelIdComboBox))
+            });
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception, new { silent });
+            throw;
         }
     }
 
@@ -516,27 +616,48 @@ public sealed partial class MainForm
 
     private async Task CreateWeKnoraKnowledgeBaseAsync()
     {
+        using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(CreateWeKnoraKnowledgeBaseAsync), new
+        {
+            knowledgeBaseName = FileTraceLogger.SummarizeText(_weKnoraKnowledgeBaseNameTextBox.Text),
+            weKnoraBaseUrl = FileTraceLogger.SummarizeText(_weKnoraBaseUrlTextBox.Text, 240)
+        });
+
         var knowledgeBaseName = _weKnoraKnowledgeBaseNameTextBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(knowledgeBaseName))
         {
             MessageBox.Show(this, "Enter a knowledge base name before creating it.", "Knowledge Base Name Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            scope.Success(new { created = false, reason = "Knowledge base name missing" });
             return;
         }
 
-        await SaveSettingsAsync(silent: true);
-        var created = await _appService.CreateWeKnoraKnowledgeBaseAsync(knowledgeBaseName);
-        _weKnoraKnowledgeBaseIdTextBox.Text = created.Id;
-        _weKnoraKnowledgeBaseNameTextBox.Text = created.Name;
-        await LoadWeKnoraKnowledgeBasesAsync(silent: true);
-
-        var selectedIndex = (_weKnoraKnowledgeBaseComboBox.DataSource as List<KnowledgeBaseChoice>)
-            ?.FindIndex(choice => string.Equals(choice.Id, created.Id, StringComparison.OrdinalIgnoreCase)) ?? -1;
-        if (selectedIndex >= 0)
+        try
         {
-            _weKnoraKnowledgeBaseComboBox.SelectedIndex = selectedIndex;
-        }
+            await SaveSettingsAsync(silent: true);
+            var created = await _appService.CreateWeKnoraKnowledgeBaseAsync(knowledgeBaseName);
+            _weKnoraKnowledgeBaseIdTextBox.Text = created.Id;
+            _weKnoraKnowledgeBaseNameTextBox.Text = created.Name;
+            await LoadWeKnoraKnowledgeBasesAsync(silent: true);
 
-        SetStatus($"Created WeKnora knowledge base '{created.Name}'.");
+            var selectedIndex = (_weKnoraKnowledgeBaseComboBox.DataSource as List<KnowledgeBaseChoice>)
+                ?.FindIndex(choice => string.Equals(choice.Id, created.Id, StringComparison.OrdinalIgnoreCase)) ?? -1;
+            if (selectedIndex >= 0)
+            {
+                _weKnoraKnowledgeBaseComboBox.SelectedIndex = selectedIndex;
+            }
+
+            SetStatus($"Created WeKnora knowledge base '{created.Name}'.");
+            scope.Success(new
+            {
+                created = true,
+                knowledgeBaseId = FileTraceLogger.SummarizeText(created.Id),
+                knowledgeBaseName = FileTraceLogger.SummarizeText(created.Name)
+            });
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception, new { knowledgeBaseName = FileTraceLogger.SummarizeText(knowledgeBaseName) });
+            throw;
+        }
     }
 
     private async Task StartSelectedWeKnoraSyncAsync()

@@ -18,40 +18,64 @@ public sealed class WeKnoraClient
 
     public async Task<IReadOnlyList<WeKnoraKnowledgeBaseInfo>> ListKnowledgeBasesAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
-        using var request = CreateRequest(HttpMethod.Get, settings, "/knowledge-bases");
-        using var document = await SendForDocumentAsync(request, cancellationToken);
-        var data = GetDataElement(document.RootElement);
-        if (data.ValueKind != JsonValueKind.Array)
-        {
-            return [];
-        }
+        using var scope = FileTraceLogger.Enter(nameof(WeKnoraClient), nameof(ListKnowledgeBasesAsync), SummarizeSettings(settings));
 
-        var results = new List<WeKnoraKnowledgeBaseInfo>();
-        foreach (var item in data.EnumerateArray())
+        try
         {
-            results.Add(ReadKnowledgeBase(item));
-        }
+            using var request = CreateRequest(HttpMethod.Get, settings, "/knowledge-bases");
+            using var document = await SendForDocumentAsync(request, cancellationToken);
+            var data = GetDataElement(document.RootElement);
+            if (data.ValueKind != JsonValueKind.Array)
+            {
+                scope.Success(new { count = 0 });
+                return [];
+            }
 
-        return results;
+            var results = new List<WeKnoraKnowledgeBaseInfo>();
+            foreach (var item in data.EnumerateArray())
+            {
+                results.Add(ReadKnowledgeBase(item));
+            }
+
+            scope.Success(new { count = results.Count });
+            return results;
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception);
+            throw;
+        }
     }
 
     public async Task<IReadOnlyList<WeKnoraModelInfo>> ListModelsAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
-        using var request = CreateRequest(HttpMethod.Get, settings, "/models");
-        using var document = await SendForDocumentAsync(request, cancellationToken);
-        var data = GetDataElement(document.RootElement);
-        if (data.ValueKind != JsonValueKind.Array)
-        {
-            return [];
-        }
+        using var scope = FileTraceLogger.Enter(nameof(WeKnoraClient), nameof(ListModelsAsync), SummarizeSettings(settings));
 
-        var results = new List<WeKnoraModelInfo>();
-        foreach (var item in data.EnumerateArray())
+        try
         {
-            results.Add(ReadModel(item));
-        }
+            using var request = CreateRequest(HttpMethod.Get, settings, "/models");
+            using var document = await SendForDocumentAsync(request, cancellationToken);
+            var data = GetDataElement(document.RootElement);
+            if (data.ValueKind != JsonValueKind.Array)
+            {
+                scope.Success(new { count = 0 });
+                return [];
+            }
 
-        return results;
+            var results = new List<WeKnoraModelInfo>();
+            foreach (var item in data.EnumerateArray())
+            {
+                results.Add(ReadModel(item));
+            }
+
+            scope.Success(new { count = results.Count });
+            return results;
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception);
+            throw;
+        }
     }
 
     public async Task<WeKnoraKnowledgeBaseInfo> CreateKnowledgeBaseAsync(
@@ -60,6 +84,13 @@ public sealed class WeKnoraClient
         string? description = null,
         CancellationToken cancellationToken = default)
     {
+        using var scope = FileTraceLogger.Enter(nameof(WeKnoraClient), nameof(CreateKnowledgeBaseAsync), new
+        {
+            settings = SummarizeSettings(settings),
+            knowledgeBaseName = FileTraceLogger.SummarizeText(name),
+            description = FileTraceLogger.SummarizeText(description, 240)
+        });
+
         var chunkSize = Math.Max(100, settings.WeKnoraChunkSize);
         var chunkOverlap = Math.Max(0, Math.Min(settings.WeKnoraChunkOverlap, chunkSize - 1));
         var payload = new
@@ -82,9 +113,23 @@ public sealed class WeKnoraClient
             }
         };
 
-        using var request = CreateJsonRequest(HttpMethod.Post, settings, "/knowledge-bases", payload);
-        using var document = await SendForDocumentAsync(request, cancellationToken);
-        return ReadKnowledgeBase(GetDataElement(document.RootElement));
+        try
+        {
+            using var request = CreateJsonRequest(HttpMethod.Post, settings, "/knowledge-bases", payload);
+            using var document = await SendForDocumentAsync(request, cancellationToken);
+            var knowledgeBase = ReadKnowledgeBase(GetDataElement(document.RootElement));
+            scope.Success(new
+            {
+                knowledgeBaseId = FileTraceLogger.SummarizeText(knowledgeBase.Id),
+                knowledgeBaseName = FileTraceLogger.SummarizeText(knowledgeBase.Name)
+            });
+            return knowledgeBase;
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception);
+            throw;
+        }
     }
 
     public async Task<WeKnoraKnowledgeItemInfo> CreateManualKnowledgeAsync(
@@ -150,35 +195,59 @@ public sealed class WeKnoraClient
         string? multimodalModelId,
         CancellationToken cancellationToken = default)
     {
+        using var scope = FileTraceLogger.Enter(nameof(WeKnoraClient), nameof(UpdateKnowledgeBaseInitializationAsync), new
+        {
+            settings = SummarizeSettings(settings),
+            knowledgeBaseId = FileTraceLogger.SummarizeText(knowledgeBaseId),
+            chatModelId = FileTraceLogger.SummarizeText(chatModelId),
+            multimodalModelId = FileTraceLogger.SummarizeText(multimodalModelId)
+        });
+
         var requestedChatModelId = NormalizeModelId(chatModelId);
         var requestedEmbeddingModelId = NormalizeModelId(settings.WeKnoraEmbeddingModelId);
         var requestedMultimodalModelId = NormalizeModelId(multimodalModelId);
         if (requestedChatModelId is null && requestedEmbeddingModelId is null && requestedMultimodalModelId is null)
         {
+            scope.Success(new { skipped = true, reason = "No model IDs were configured" });
             return;
         }
 
-        var (defaultKnowledgeQaModelId, defaultEmbeddingModelId) = await ResolveDefaultModelIdsAsync(settings, cancellationToken);
-        var resolvedChatModelId = requestedChatModelId ?? defaultKnowledgeQaModelId;
-        var resolvedEmbeddingModelId = requestedEmbeddingModelId ?? defaultEmbeddingModelId;
-        if (resolvedChatModelId is null)
+        try
         {
-            throw new InvalidOperationException("WeKnora requires a KnowledgeQA model to initialize a knowledge base. Configure a chat model ID or ensure the server exposes a KnowledgeQA model.");
-        }
+            var (defaultKnowledgeQaModelId, defaultEmbeddingModelId) = await ResolveDefaultModelIdsAsync(settings, cancellationToken);
+            var resolvedChatModelId = requestedChatModelId ?? defaultKnowledgeQaModelId;
+            var resolvedEmbeddingModelId = requestedEmbeddingModelId ?? defaultEmbeddingModelId;
+            if (resolvedChatModelId is null)
+            {
+                throw new InvalidOperationException("WeKnora requires a KnowledgeQA model to initialize a knowledge base. Configure a chat model ID or ensure the server exposes a KnowledgeQA model.");
+            }
 
-        if (resolvedEmbeddingModelId is null)
+            if (resolvedEmbeddingModelId is null)
+            {
+                throw new InvalidOperationException("WeKnora requires an Embedding model to initialize a knowledge base. Ensure the server exposes at least one Embedding model.");
+            }
+
+            var payload = BuildInitializationPayload(resolvedChatModelId, resolvedEmbeddingModelId, requestedMultimodalModelId);
+
+            using var request = CreateJsonRequest(
+                HttpMethod.Put,
+                settings,
+                $"/initialization/config/{Uri.EscapeDataString(knowledgeBaseId)}",
+                payload);
+            using var _ = await SendForDocumentAsync(request, cancellationToken);
+            scope.Success(new
+            {
+                skipped = false,
+                resolvedChatModelId = FileTraceLogger.SummarizeText(resolvedChatModelId),
+                resolvedEmbeddingModelId = FileTraceLogger.SummarizeText(resolvedEmbeddingModelId),
+                resolvedMultimodalModelId = FileTraceLogger.SummarizeText(requestedMultimodalModelId)
+            });
+        }
+        catch (Exception exception)
         {
-            throw new InvalidOperationException("WeKnora requires an Embedding model to initialize a knowledge base. Ensure the server exposes at least one Embedding model.");
+            scope.Fail(exception);
+            throw;
         }
-
-        var payload = BuildInitializationPayload(resolvedChatModelId, resolvedEmbeddingModelId, requestedMultimodalModelId);
-
-        using var request = CreateJsonRequest(
-            HttpMethod.Put,
-            settings,
-            $"/initialization/config/{Uri.EscapeDataString(knowledgeBaseId)}",
-            payload);
-        using var _ = await SendForDocumentAsync(request, cancellationToken);
     }
 
     private async Task<(string? KnowledgeQaModelId, string? EmbeddingModelId)> ResolveDefaultModelIdsAsync(AppSettings settings, CancellationToken cancellationToken)
@@ -330,10 +399,32 @@ public sealed class WeKnoraClient
 
     private static async Task<JsonDocument> SendForDocumentAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        FileTraceLogger.Info(nameof(WeKnoraClient), "HTTP REQUEST", new
+        {
+            method = request.Method.Method,
+            uri = FileTraceLogger.SummarizeText(request.RequestUri?.ToString(), 320)
+        });
+
         using var response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+        FileTraceLogger.Info(nameof(WeKnoraClient), "HTTP RESPONSE", new
+        {
+            method = request.Method.Method,
+            uri = FileTraceLogger.SummarizeText(request.RequestUri?.ToString(), 320),
+            statusCode = (int)response.StatusCode,
+            response.StatusCode,
+            payloadLength = payload.Length
+        });
+
         if (!response.IsSuccessStatusCode)
         {
+            FileTraceLogger.Warning(nameof(WeKnoraClient), "HTTP RESPONSE NOT SUCCESS", new
+            {
+                method = request.Method.Method,
+                uri = FileTraceLogger.SummarizeText(request.RequestUri?.ToString(), 320),
+                statusCode = (int)response.StatusCode,
+                payload = FileTraceLogger.SummarizeText(payload, 512)
+            });
             throw new InvalidOperationException(BuildApiError(response.StatusCode, payload));
         }
 
@@ -481,5 +572,20 @@ public sealed class WeKnoraClient
 
         var raw = property.ToString();
         return bool.TryParse(raw, out var parsed) && parsed;
+    }
+
+    private static object SummarizeSettings(AppSettings settings)
+    {
+        return new
+        {
+            weKnoraBaseUrl = FileTraceLogger.SummarizeText(settings.WeKnoraBaseUrl, 240),
+            weKnoraAccessToken = FileTraceLogger.RedactSecret(settings.WeKnoraAccessToken),
+            weKnoraAuthMode = settings.WeKnoraAuthMode.ToString(),
+            weKnoraKnowledgeBaseId = FileTraceLogger.SummarizeText(settings.WeKnoraKnowledgeBaseId),
+            weKnoraKnowledgeBaseName = FileTraceLogger.SummarizeText(settings.WeKnoraKnowledgeBaseName),
+            weKnoraChatModelId = FileTraceLogger.SummarizeText(settings.WeKnoraChatModelId),
+            weKnoraEmbeddingModelId = FileTraceLogger.SummarizeText(settings.WeKnoraEmbeddingModelId),
+            weKnoraMultimodalModelId = FileTraceLogger.SummarizeText(settings.WeKnoraMultimodalModelId)
+        };
     }
 }

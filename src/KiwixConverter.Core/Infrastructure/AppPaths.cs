@@ -9,6 +9,8 @@ public static class AppPaths
 
     public static string ScratchDirectory => EnsureDirectory(Path.Combine(ApplicationDataDirectory, "scratch"));
 
+    public static string LogsDirectory => EnsureDirectory(Path.Combine(ApplicationDataDirectory, "logs"));
+
     public static string EnsureDirectory(string path)
     {
         Directory.CreateDirectory(path);

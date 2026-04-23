@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using KiwixConverter.Core.Infrastructure;
 using KiwixConverter.Core.Models;
 
 namespace KiwixConverter.Core.Conversion;
@@ -113,13 +114,28 @@ public sealed class ZimdumpClient
 
     public async Task<string> GetVersionAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
-        return (await ExecuteTextUsingStrategiesAsync(
-            settings,
-            [
-                ["--version"],
-                ["-V"]
-            ],
-            cancellationToken)).Trim();
+        using var scope = FileTraceLogger.Enter(nameof(ZimdumpClient), nameof(GetVersionAsync), new
+        {
+            zimdumpExecutablePath = FileTraceLogger.SummarizePath(settings.ZimdumpExecutablePath)
+        });
+
+        try
+        {
+            var version = (await ExecuteTextUsingStrategiesAsync(
+                settings,
+                [
+                    ["--version"],
+                    ["-V"]
+                ],
+                cancellationToken)).Trim();
+            scope.Success(new { version = FileTraceLogger.SummarizeText(version, 240) });
+            return version;
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception);
+            throw;
+        }
     }
 
     private static IEnumerable<string> BuildUrlCandidates(string url)
@@ -413,11 +429,21 @@ public sealed class ZimdumpClient
         {
             try
             {
+                FileTraceLogger.Info(nameof(ZimdumpClient), "ExecuteTextUsingStrategiesAsync ATTEMPT", new
+                {
+                    arguments = arguments.ToArray(),
+                    zimdumpExecutablePath = FileTraceLogger.SummarizePath(settings.ZimdumpExecutablePath)
+                });
                 return await ExecuteTextAsync(settings, arguments, cancellationToken);
             }
             catch (Exception exception)
             {
                 lastException = exception;
+                FileTraceLogger.Warning(nameof(ZimdumpClient), "ExecuteTextUsingStrategiesAsync ATTEMPT FAILED", new
+                {
+                    arguments = arguments.ToArray(),
+                    message = FileTraceLogger.SummarizeText(exception.Message, 320)
+                });
             }
         }
 
@@ -426,45 +452,65 @@ public sealed class ZimdumpClient
 
     private static async Task<byte[]> ExecuteBytesAsync(AppSettings settings, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
     {
-        var executable = ResolveExecutable(settings);
-        var startInfo = new ProcessStartInfo
+        using var scope = FileTraceLogger.Enter(nameof(ZimdumpClient), nameof(ExecuteBytesAsync), new
         {
-            FileName = executable,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8
-        };
+            zimdumpExecutablePath = FileTraceLogger.SummarizePath(settings.ZimdumpExecutablePath),
+            arguments = arguments.ToArray()
+        });
 
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        using var process = new Process { StartInfo = startInfo };
         try
         {
-            process.Start();
+            var executable = ResolveExecutable(settings);
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = executable,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
+
+            foreach (var argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            using var process = new Process { StartInfo = startInfo };
+            try
+            {
+                process.Start();
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidOperationException($"Failed to start zimdump executable '{executable}'.", exception);
+            }
+
+            await using var outputStream = new MemoryStream();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            await process.StandardOutput.BaseStream.CopyToAsync(outputStream, cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+
+            var standardError = await errorTask;
+            if (process.ExitCode != 0)
+            {
+                throw new InvalidOperationException($"zimdump exited with code {process.ExitCode}: {standardError}".Trim());
+            }
+
+            var bytes = outputStream.ToArray();
+            scope.Success(new
+            {
+                executable = FileTraceLogger.SummarizePath(executable),
+                byteCount = bytes.Length
+            });
+            return bytes;
         }
         catch (Exception exception)
         {
-            throw new InvalidOperationException($"Failed to start zimdump executable '{executable}'.", exception);
+            scope.Fail(exception);
+            throw;
         }
-
-        await using var outputStream = new MemoryStream();
-        var errorTask = process.StandardError.ReadToEndAsync();
-        await process.StandardOutput.BaseStream.CopyToAsync(outputStream, cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-
-        var standardError = await errorTask;
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException($"zimdump exited with code {process.ExitCode}: {standardError}".Trim());
-        }
-
-        return outputStream.ToArray();
     }
 
     private static string ResolveExecutable(AppSettings settings)

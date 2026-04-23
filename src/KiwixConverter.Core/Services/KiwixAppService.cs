@@ -25,26 +25,80 @@ public sealed class KiwixAppService
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        await _repository.InitializeAsync(cancellationToken);
-        await _repository.MarkInterruptedTasksAsPausedAsync(cancellationToken);
-        await _repository.MarkInterruptedWeKnoraSyncTasksAsPausedAsync(cancellationToken);
+        using var scope = FileTraceLogger.Enter(nameof(KiwixAppService), nameof(InitializeAsync));
+
+        try
+        {
+            await _repository.InitializeAsync(cancellationToken);
+            await _repository.MarkInterruptedTasksAsPausedAsync(cancellationToken);
+            await _repository.MarkInterruptedWeKnoraSyncTasksAsPausedAsync(cancellationToken);
+            scope.Success();
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception);
+            throw;
+        }
     }
 
-    public Task<AppSettings> GetSettingsAsync(CancellationToken cancellationToken = default)
-        => _repository.GetSettingsAsync(cancellationToken);
+    public async Task<AppSettings> GetSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        using var scope = FileTraceLogger.Enter(nameof(KiwixAppService), nameof(GetSettingsAsync));
 
-    public Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
-        => _repository.SaveSettingsAsync(settings, cancellationToken);
+        try
+        {
+            var settings = await _repository.GetSettingsAsync(cancellationToken);
+            scope.Success(SummarizeSettings(settings));
+            return settings;
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception);
+            throw;
+        }
+    }
+
+    public async Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    {
+        using var scope = FileTraceLogger.Enter(nameof(KiwixAppService), nameof(SaveSettingsAsync), SummarizeSettings(settings));
+
+        try
+        {
+            await _repository.SaveSettingsAsync(settings, cancellationToken);
+            scope.Success();
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception, SummarizeSettings(settings));
+            throw;
+        }
+    }
 
     public async Task<IReadOnlyList<ZimLibraryItem>> ScanAsync(CancellationToken cancellationToken = default)
     {
-        var settings = await _repository.GetSettingsAsync(cancellationToken);
-        if (string.IsNullOrWhiteSpace(settings.KiwixDesktopDirectory))
-        {
-            throw new InvalidOperationException("The kiwix-desktop directory must be configured before scanning.");
-        }
+        using var scope = FileTraceLogger.Enter(nameof(KiwixAppService), nameof(ScanAsync));
 
-        return await _libraryScanner.ScanAsync(settings.KiwixDesktopDirectory, cancellationToken);
+        try
+        {
+            var settings = await _repository.GetSettingsAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(settings.KiwixDesktopDirectory))
+            {
+                throw new InvalidOperationException("The kiwix-desktop directory must be configured before scanning.");
+            }
+
+            var items = await _libraryScanner.ScanAsync(settings.KiwixDesktopDirectory, cancellationToken);
+            scope.Success(new
+            {
+                kiwixDesktopDirectory = FileTraceLogger.SummarizePath(settings.KiwixDesktopDirectory),
+                count = items.Count
+            });
+            return items;
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception);
+            throw;
+        }
     }
 
     public Task<IReadOnlyList<ZimLibraryItem>> GetDownloadsAsync(CancellationToken cancellationToken = default)
@@ -122,93 +176,155 @@ public sealed class KiwixAppService
 
     public async Task<ToolAvailabilityResult> GetZimdumpAvailabilityAsync(CancellationToken cancellationToken = default)
     {
+        using var scope = FileTraceLogger.Enter(nameof(KiwixAppService), nameof(GetZimdumpAvailabilityAsync));
+
         var settings = await _repository.GetSettingsAsync(cancellationToken);
         try
         {
             var version = await _zimdumpClient.GetVersionAsync(settings, cancellationToken);
-            return new ToolAvailabilityResult
+            var result = new ToolAvailabilityResult
             {
                 IsAvailable = true,
                 ResolvedPath = string.IsNullOrWhiteSpace(settings.ZimdumpExecutablePath) ? "PATH (zimdump)" : settings.ZimdumpExecutablePath,
                 Version = version,
                 Message = "zimdump is available."
             };
+            scope.Success(SummarizeToolAvailability(result));
+            return result;
         }
         catch (Exception exception)
         {
-            return new ToolAvailabilityResult
+            var result = new ToolAvailabilityResult
             {
                 IsAvailable = false,
                 ResolvedPath = settings.ZimdumpExecutablePath,
                 Message = exception.Message
             };
+            scope.Success(SummarizeToolAvailability(result));
+            return result;
         }
     }
 
     public async Task<IReadOnlyList<WeKnoraKnowledgeBaseInfo>> GetWeKnoraKnowledgeBasesAsync(CancellationToken cancellationToken = default)
     {
-        var settings = await _repository.GetSettingsAsync(cancellationToken);
-        return await _weKnoraClient.ListKnowledgeBasesAsync(settings, cancellationToken);
+        using var scope = FileTraceLogger.Enter(nameof(KiwixAppService), nameof(GetWeKnoraKnowledgeBasesAsync));
+
+        try
+        {
+            var settings = await _repository.GetSettingsAsync(cancellationToken);
+            var knowledgeBases = await _weKnoraClient.ListKnowledgeBasesAsync(settings, cancellationToken);
+            scope.Success(new
+            {
+                count = knowledgeBases.Count,
+                weKnoraBaseUrl = FileTraceLogger.SummarizeText(settings.WeKnoraBaseUrl, 240)
+            });
+            return knowledgeBases;
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception);
+            throw;
+        }
     }
 
     public async Task<IReadOnlyList<WeKnoraModelInfo>> GetWeKnoraModelsAsync(CancellationToken cancellationToken = default)
     {
-        var settings = await _repository.GetSettingsAsync(cancellationToken);
-        return await _weKnoraClient.ListModelsAsync(settings, cancellationToken);
+        using var scope = FileTraceLogger.Enter(nameof(KiwixAppService), nameof(GetWeKnoraModelsAsync));
+
+        try
+        {
+            var settings = await _repository.GetSettingsAsync(cancellationToken);
+            var models = await _weKnoraClient.ListModelsAsync(settings, cancellationToken);
+            scope.Success(new
+            {
+                count = models.Count,
+                weKnoraBaseUrl = FileTraceLogger.SummarizeText(settings.WeKnoraBaseUrl, 240)
+            });
+            return models;
+        }
+        catch (Exception exception)
+        {
+            scope.Fail(exception);
+            throw;
+        }
     }
 
     public async Task<WeKnoraKnowledgeBaseInfo> CreateWeKnoraKnowledgeBaseAsync(string knowledgeBaseName, CancellationToken cancellationToken = default)
     {
+        using var scope = FileTraceLogger.Enter(nameof(KiwixAppService), nameof(CreateWeKnoraKnowledgeBaseAsync), new
+        {
+            knowledgeBaseName = FileTraceLogger.SummarizeText(knowledgeBaseName)
+        });
+
         if (string.IsNullOrWhiteSpace(knowledgeBaseName))
         {
             throw new InvalidOperationException("Enter a WeKnora knowledge base name before creating it.");
         }
 
-        var settings = await _repository.GetSettingsAsync(cancellationToken);
-        if (string.IsNullOrWhiteSpace(settings.WeKnoraBaseUrl))
+        try
         {
-            throw new InvalidOperationException("Configure the WeKnora base URL before creating a knowledge base.");
-        }
+            var settings = await _repository.GetSettingsAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(settings.WeKnoraBaseUrl))
+            {
+                throw new InvalidOperationException("Configure the WeKnora base URL before creating a knowledge base.");
+            }
 
-        if (string.IsNullOrWhiteSpace(settings.WeKnoraAccessToken))
+            if (string.IsNullOrWhiteSpace(settings.WeKnoraAccessToken))
+            {
+                throw new InvalidOperationException("Configure the WeKnora access token before creating a knowledge base.");
+            }
+
+            var knowledgeBase = await _weKnoraClient.CreateKnowledgeBaseAsync(
+                settings,
+                knowledgeBaseName.Trim(),
+                string.IsNullOrWhiteSpace(settings.WeKnoraKnowledgeBaseDescription)
+                    ? "Imported Markdown articles from Kiwix Converter."
+                    : settings.WeKnoraKnowledgeBaseDescription.Trim(),
+                cancellationToken);
+
+            await ApplyConfiguredWeKnoraModelsAsync(settings, knowledgeBase.Id, cancellationToken);
+
+            settings.WeKnoraKnowledgeBaseId = knowledgeBase.Id;
+            settings.WeKnoraKnowledgeBaseName = knowledgeBase.Name;
+            await _repository.SaveSettingsAsync(settings, cancellationToken);
+            scope.Success(new
+            {
+                knowledgeBaseId = FileTraceLogger.SummarizeText(knowledgeBase.Id),
+                knowledgeBaseName = FileTraceLogger.SummarizeText(knowledgeBase.Name)
+            });
+            return knowledgeBase;
+        }
+        catch (Exception exception)
         {
-            throw new InvalidOperationException("Configure the WeKnora access token before creating a knowledge base.");
+            scope.Fail(exception, new { knowledgeBaseName = FileTraceLogger.SummarizeText(knowledgeBaseName) });
+            throw;
         }
-
-        var knowledgeBase = await _weKnoraClient.CreateKnowledgeBaseAsync(
-            settings,
-            knowledgeBaseName.Trim(),
-            string.IsNullOrWhiteSpace(settings.WeKnoraKnowledgeBaseDescription)
-                ? "Imported Markdown articles from Kiwix Converter."
-                : settings.WeKnoraKnowledgeBaseDescription.Trim(),
-            cancellationToken);
-
-        await ApplyConfiguredWeKnoraModelsAsync(settings, knowledgeBase.Id, cancellationToken);
-
-        settings.WeKnoraKnowledgeBaseId = knowledgeBase.Id;
-        settings.WeKnoraKnowledgeBaseName = knowledgeBase.Name;
-        await _repository.SaveSettingsAsync(settings, cancellationToken);
-        return knowledgeBase;
     }
 
     public async Task<ToolAvailabilityResult> TestWeKnoraConnectionAsync(CancellationToken cancellationToken = default)
     {
+        using var scope = FileTraceLogger.Enter(nameof(KiwixAppService), nameof(TestWeKnoraConnectionAsync));
+
         try
         {
             var knowledgeBases = await GetWeKnoraKnowledgeBasesAsync(cancellationToken);
-            return new ToolAvailabilityResult
+            var result = new ToolAvailabilityResult
             {
                 IsAvailable = true,
                 Message = $"Connected to WeKnora. Found {knowledgeBases.Count} knowledge base(s)."
             };
+            scope.Success(SummarizeToolAvailability(result));
+            return result;
         }
         catch (Exception exception)
         {
-            return new ToolAvailabilityResult
+            var result = new ToolAvailabilityResult
             {
                 IsAvailable = false,
                 Message = exception.Message
             };
+            scope.Success(SummarizeToolAvailability(result));
+            return result;
         }
     }
 
@@ -322,4 +438,33 @@ public sealed class KiwixAppService
             settings.WeKnoraChatModelId,
             settings.WeKnoraMultimodalModelId,
             cancellationToken);
+
+    private static object SummarizeSettings(AppSettings settings)
+    {
+        return new
+        {
+            kiwixDesktopDirectory = FileTraceLogger.SummarizePath(settings.KiwixDesktopDirectory),
+            defaultOutputDirectory = FileTraceLogger.SummarizePath(settings.DefaultOutputDirectory),
+            zimdumpExecutablePath = FileTraceLogger.SummarizePath(settings.ZimdumpExecutablePath),
+            weKnoraBaseUrl = FileTraceLogger.SummarizeText(settings.WeKnoraBaseUrl, 240),
+            weKnoraAccessToken = FileTraceLogger.RedactSecret(settings.WeKnoraAccessToken),
+            weKnoraKnowledgeBaseId = FileTraceLogger.SummarizeText(settings.WeKnoraKnowledgeBaseId),
+            weKnoraKnowledgeBaseName = FileTraceLogger.SummarizeText(settings.WeKnoraKnowledgeBaseName),
+            weKnoraChatModelId = FileTraceLogger.SummarizeText(settings.WeKnoraChatModelId),
+            weKnoraEmbeddingModelId = FileTraceLogger.SummarizeText(settings.WeKnoraEmbeddingModelId),
+            weKnoraMultimodalModelId = FileTraceLogger.SummarizeText(settings.WeKnoraMultimodalModelId),
+            weKnoraAuthMode = settings.WeKnoraAuthMode.ToString()
+        };
+    }
+
+    private static object SummarizeToolAvailability(ToolAvailabilityResult result)
+    {
+        return new
+        {
+            result.IsAvailable,
+            resolvedPath = FileTraceLogger.SummarizePath(result.ResolvedPath),
+            version = FileTraceLogger.SummarizeText(result.Version, 240),
+            message = FileTraceLogger.SummarizeText(result.Message, 320)
+        };
+    }
 }

@@ -6,7 +6,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>12.0</LangVersion>
+    <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\AppLogo.png" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\KiwixConverter.Core\KiwixConverter.Core.csproj" />
