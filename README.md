@@ -18,6 +18,13 @@ Kiwix Converter is a WinForms + SQLite desktop application for exporting kiwix-d
 - Writes article-level checkpoint state into SQLite so paused or interrupted tasks resume from the last article boundary instead of restarting the full archive.
 - Produces Markdown, per-article metadata JSON, chunked JSONL for RAG ingestion, and root-level archive/task snapshot files.
 
+## Desktop Localization
+
+- The WinForms app now auto-detects the current Windows UI language on startup.
+- Supported desktop UI languages match the README and wiki set: English, Simplified Chinese, Japanese, Spanish, and Arabic.
+- When the system language is not one of the supported languages, the app falls back to English.
+- Arabic uses a right-to-left shell layout automatically.
+
 ## Solution Layout
 
 ```text
@@ -121,6 +128,13 @@ The sync UI lets you:
 - The same release workflow still supports `workflow_dispatch` if you want to override the version manually.
 - Release assets are named with the conventional `vX.Y.Z` tag format and include a SHA-256 checksum file.
 - `.github/release.yml` defines the automatic release note structure so generated notes read like a conventional release summary instead of a raw commit list.
+
+### Local Validate-And-Sync Script
+
+- Use `scripts/validate-and-sync.ps1 -CommitMessage "your message"` to run a release build, create a local commit, and sync the result to GitHub.
+- The script now prefers the `gh api` path by default because this environment can reach GitHub's API even when direct `git push` / `git fetch` calls to `github.com:443` fail.
+- Use `-TryGitPush` only if you explicitly want the script to attempt a normal `git push` before falling back to the GitHub API path.
+- Use `-SkipBuild -SkipCommit` only on a clean working tree when you want to re-run the sync step without rebuilding or committing again.
 
 ## Wiki Sources
 
