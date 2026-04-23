@@ -3,6 +3,7 @@ param(
     [string]$CommitMessage,
     [switch]$SkipBuild,
     [switch]$SkipCommit,
+    [switch]$TryGitPush,
     [string]$Repository = "qurikuduo/kiwix_converter"
 )
 
@@ -51,6 +52,84 @@ function Test-GitHubGitConnectivity {
     }
 }
 
+function Get-RemoteGitCommit {
+    param(
+        [string]$RepositoryName,
+        [string]$CommitSha
+    )
+
+    $remoteCommitJson = & gh api "repos/$RepositoryName/git/commits/$CommitSha"
+    Assert-LastExitCode "gh api git/commits/$CommitSha"
+    return $remoteCommitJson | ConvertFrom-Json
+}
+
+function Get-LocalCommitMetadata {
+    param(
+        [string]$CommitSha
+    )
+
+    $payload = (& git show -s --format='%T%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%cn%x1f%ce%x1f%cI%x1f%B' $CommitSha)
+    Assert-LastExitCode "git show metadata for $CommitSha"
+
+    $parts = $payload -split [char]31, 9
+    return [pscustomobject]@{
+        TreeSha = $parts[0]
+        ParentShas = if ([string]::IsNullOrWhiteSpace($parts[1])) { @() } else { @($parts[1] -split ' ') }
+        AuthorName = $parts[2]
+        AuthorEmail = $parts[3]
+        AuthorDate = [DateTimeOffset]::Parse($parts[4])
+        CommitterName = $parts[5]
+        CommitterEmail = $parts[6]
+        CommitterDate = [DateTimeOffset]::Parse($parts[7])
+        Message = $parts[8].TrimEnd("`r", "`n")
+    }
+}
+
+function Test-CommitEquivalence {
+    param(
+        [string]$LocalCommitSha,
+        [object]$RemoteCommit
+    )
+
+    $localCommit = Get-LocalCommitMetadata -CommitSha $LocalCommitSha
+    $localParentShas = @($localCommit.ParentShas | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $remoteParentShas = @($RemoteCommit.parents | ForEach-Object { $_.sha } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $remoteAuthorDate = [DateTimeOffset]::Parse($RemoteCommit.author.date)
+    $remoteCommitterDate = [DateTimeOffset]::Parse($RemoteCommit.committer.date)
+
+    if ($localParentShas.Count -ne $remoteParentShas.Count) {
+        return $false
+    }
+
+    for ($index = 0; $index -lt $localParentShas.Count; $index++) {
+        if ($localParentShas[$index] -ne $remoteParentShas[$index]) {
+            return $false
+        }
+    }
+
+    return $localCommit.TreeSha -eq $RemoteCommit.tree.sha -and
+        $localCommit.AuthorName -eq $RemoteCommit.author.name -and
+        $localCommit.AuthorEmail -eq $RemoteCommit.author.email -and
+        $localCommit.AuthorDate.ToUniversalTime() -eq $remoteAuthorDate.ToUniversalTime() -and
+        $localCommit.CommitterName -eq $RemoteCommit.committer.name -and
+        $localCommit.CommitterEmail -eq $RemoteCommit.committer.email -and
+        $localCommit.CommitterDate.ToUniversalTime() -eq $remoteCommitterDate.ToUniversalTime() -and
+        $localCommit.Message -eq ([string]$RemoteCommit.message)
+}
+
+function Update-EquivalentTrackingRefs {
+    param(
+        [string]$LocalCommitSha,
+        [string]$ActualRemoteSha
+    )
+
+    & git update-ref refs/remotes/origin/main-github $ActualRemoteSha
+    Assert-LastExitCode "git update-ref refs/remotes/origin/main-github"
+
+    & git update-ref refs/remotes/origin/main $LocalCommitSha
+    Assert-LastExitCode "git update-ref refs/remotes/origin/main"
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $repoRoot
 
@@ -93,19 +172,21 @@ $remoteHead = (& gh api "repos/$Repository/git/ref/heads/main" --jq ".object.sha
 Assert-LastExitCode "gh api git/ref/heads/main"
 
 if ($remoteHead -eq $localHead) {
+    Update-EquivalentTrackingRefs -LocalCommitSha $localHead -ActualRemoteSha $remoteHead
     Write-Step "GitHub main already matches the local HEAD"
     & git status --short --branch
     Assert-LastExitCode "git status --short --branch"
     return
 }
 
-if (Test-GitHubGitConnectivity) {
+if ($TryGitPush -and (Test-GitHubGitConnectivity)) {
     Write-Step "Trying a normal git push first"
     $previousPromptSetting = $env:GIT_TERMINAL_PROMPT
     try {
         $env:GIT_TERMINAL_PROMPT = "0"
         & git push origin main
         if ($LASTEXITCODE -eq 0) {
+            Update-EquivalentTrackingRefs -LocalCommitSha $localHead -ActualRemoteSha $localHead
             Write-Step "git push succeeded"
             & git status --short --branch
             Assert-LastExitCode "git status --short --branch"
@@ -123,19 +204,27 @@ if (Test-GitHubGitConnectivity) {
 
     Write-Warning "git push failed with exit code $LASTEXITCODE. Falling back to a GitHub API fast-forward update."
 }
-else {
+elseif ($TryGitPush) {
     Write-Warning "Direct git connectivity to github.com:443 is unavailable. Falling back to a GitHub API fast-forward update."
+}
+else {
+    Write-Warning "Skipping direct git push and using the GitHub API sync path. Pass -TryGitPush to try a normal git push first."
 }
 
 $parentSha = (& git rev-parse HEAD^).Trim()
 Assert-LastExitCode "git rev-parse HEAD^"
 
+$remoteHeadCommit = Get-RemoteGitCommit -RepositoryName $Repository -CommitSha $remoteHead
+
 if ($remoteHead -ne $parentSha) {
-    throw "GitHub main ($remoteHead) is not the parent of local HEAD ($parentSha). Aborting API fallback to avoid overwriting remote history."
+    if (-not (Test-CommitEquivalence -LocalCommitSha $parentSha -RemoteCommit $remoteHeadCommit)) {
+        throw "GitHub main ($remoteHead) is not equivalent to the parent of local HEAD ($parentSha). Aborting API fallback to avoid overwriting remote history."
+    }
+
+    Write-Warning "GitHub main differs by SHA from the local parent but is content-equivalent. Continuing with the GitHub main SHA as the remote parent."
 }
 
-$baseTreeSha = (& gh api "repos/$Repository/git/commits/$remoteHead" --jq ".tree.sha").Trim()
-Assert-LastExitCode "gh api git/commits/$remoteHead"
+$baseTreeSha = $remoteHeadCommit.tree.sha
 
 $changes = & git diff-tree --no-commit-id --name-status --no-renames -r HEAD
 Assert-LastExitCode "git diff-tree"
@@ -220,7 +309,7 @@ Assert-LastExitCode "git log commit message"
 $commitBody = @{
     message = $commitMessageValue
     tree = $createdTreeSha
-    parents = @($parentSha)
+    parents = @($remoteHead)
     author = @{
         name = $authorName
         email = $authorEmail
@@ -244,25 +333,14 @@ Write-Host "GitHub main updated to $remoteCommitSha via gh API fallback." -Foreg
 $confirmedRemoteHead = (& gh api "repos/$Repository/git/ref/heads/main" --jq ".object.sha").Trim()
 Assert-LastExitCode "gh api confirm git/ref/heads/main"
 
-if ($confirmedRemoteHead -ne $localHead) {
-    & git cat-file -e "$confirmedRemoteHead^{commit}"
-    $remoteCommitExistsLocally = $LASTEXITCODE -eq 0
+$confirmedRemoteCommit = Get-RemoteGitCommit -RepositoryName $Repository -CommitSha $confirmedRemoteHead
 
-    & git diff --quiet $localHead $confirmedRemoteHead
-    $commitsAreContentEquivalent = $LASTEXITCODE -eq 0
-
-    $postSyncWorktreeStatus = & git status --porcelain
-    Assert-LastExitCode "git status --porcelain after sync"
-
-    if ($remoteCommitExistsLocally -and $commitsAreContentEquivalent -and [string]::IsNullOrWhiteSpace($postSyncWorktreeStatus)) {
-        & git update-ref refs/heads/main $confirmedRemoteHead $localHead
-        Assert-LastExitCode "git update-ref refs/heads/main"
-        Write-Host "Aligned local main to remote-equivalent commit $confirmedRemoteHead." -ForegroundColor Green
-        $localHead = $confirmedRemoteHead
-    }
-    else {
-        Write-Warning "Local HEAD remains $localHead while GitHub main now points at $confirmedRemoteHead. Run git fetch once github.com connectivity is healthy to fully reconcile local history."
-    }
+if (Test-CommitEquivalence -LocalCommitSha $localHead -RemoteCommit $confirmedRemoteCommit) {
+    Update-EquivalentTrackingRefs -LocalCommitSha $localHead -ActualRemoteSha $confirmedRemoteHead
+    Write-Host "Updated local tracking refs using content-equivalent GitHub main $confirmedRemoteHead." -ForegroundColor Green
+}
+else {
+    Write-Warning "Local HEAD remains $localHead while GitHub main now points at $confirmedRemoteHead. Run git fetch once github.com connectivity is healthy to fully reconcile local history."
 }
 
 Write-Host "Confirmed GitHub main: $confirmedRemoteHead" -ForegroundColor Green
