@@ -27,6 +27,30 @@ function Write-Step {
     Write-Host "==> $Message" -ForegroundColor Cyan
 }
 
+function Test-GitHubGitConnectivity {
+    param(
+        [int]$TimeoutMilliseconds = 3000
+    )
+
+    $client = New-Object System.Net.Sockets.TcpClient
+
+    try {
+        $asyncResult = $client.BeginConnect("github.com", 443, $null, $null)
+        if (-not $asyncResult.AsyncWaitHandle.WaitOne($TimeoutMilliseconds, $false)) {
+            return $false
+        }
+
+        $client.EndConnect($asyncResult)
+        return $true
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $repoRoot
 
@@ -75,16 +99,33 @@ if ($remoteHead -eq $localHead) {
     return
 }
 
-Write-Step "Trying a normal git push first"
-& git push origin main
-if ($LASTEXITCODE -eq 0) {
-    Write-Step "git push succeeded"
-    & git status --short --branch
-    Assert-LastExitCode "git status --short --branch"
-    return
-}
+if (Test-GitHubGitConnectivity) {
+    Write-Step "Trying a normal git push first"
+    $previousPromptSetting = $env:GIT_TERMINAL_PROMPT
+    try {
+        $env:GIT_TERMINAL_PROMPT = "0"
+        & git push origin main
+        if ($LASTEXITCODE -eq 0) {
+            Write-Step "git push succeeded"
+            & git status --short --branch
+            Assert-LastExitCode "git status --short --branch"
+            return
+        }
+    }
+    finally {
+        if ($null -eq $previousPromptSetting) {
+            Remove-Item Env:GIT_TERMINAL_PROMPT -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:GIT_TERMINAL_PROMPT = $previousPromptSetting
+        }
+    }
 
-Write-Warning "git push failed. Falling back to a GitHub API fast-forward update."
+    Write-Warning "git push failed with exit code $LASTEXITCODE. Falling back to a GitHub API fast-forward update."
+}
+else {
+    Write-Warning "Direct git connectivity to github.com:443 is unavailable. Falling back to a GitHub API fast-forward update."
+}
 
 $parentSha = (& git rev-parse HEAD^).Trim()
 Assert-LastExitCode "git rev-parse HEAD^"
@@ -200,10 +241,28 @@ $null = $refBody | & gh api "repos/$Repository/git/refs/heads/main" -X PATCH --i
 Assert-LastExitCode "gh api git/refs/heads/main PATCH"
 
 Write-Host "GitHub main updated to $remoteCommitSha via gh API fallback." -ForegroundColor Green
-if ($remoteCommitSha -ne $localHead) {
-    Write-Warning "Local HEAD remains $localHead while GitHub main now points at $remoteCommitSha. Run git fetch once github.com connectivity is healthy to fully reconcile local history."
-}
-
 $confirmedRemoteHead = (& gh api "repos/$Repository/git/ref/heads/main" --jq ".object.sha").Trim()
 Assert-LastExitCode "gh api confirm git/ref/heads/main"
+
+if ($confirmedRemoteHead -ne $localHead) {
+    & git cat-file -e "$confirmedRemoteHead^{commit}"
+    $remoteCommitExistsLocally = $LASTEXITCODE -eq 0
+
+    & git diff --quiet $localHead $confirmedRemoteHead
+    $commitsAreContentEquivalent = $LASTEXITCODE -eq 0
+
+    $postSyncWorktreeStatus = & git status --porcelain
+    Assert-LastExitCode "git status --porcelain after sync"
+
+    if ($remoteCommitExistsLocally -and $commitsAreContentEquivalent -and [string]::IsNullOrWhiteSpace($postSyncWorktreeStatus)) {
+        & git update-ref refs/heads/main $confirmedRemoteHead $localHead
+        Assert-LastExitCode "git update-ref refs/heads/main"
+        Write-Host "Aligned local main to remote-equivalent commit $confirmedRemoteHead." -ForegroundColor Green
+        $localHead = $confirmedRemoteHead
+    }
+    else {
+        Write-Warning "Local HEAD remains $localHead while GitHub main now points at $confirmedRemoteHead. Run git fetch once github.com connectivity is healthy to fully reconcile local history."
+    }
+}
+
 Write-Host "Confirmed GitHub main: $confirmedRemoteHead" -ForegroundColor Green
