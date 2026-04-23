@@ -103,11 +103,10 @@ function Update-EquivalentTrackingRefs {
         [string]$ActualRemoteSha
     )
 
-    & git update-ref refs/remotes/origin/main-github $ActualRemoteSha
-    Assert-LastExitCode "git update-ref refs/remotes/origin/main-github"
-
     & git update-ref refs/remotes/origin/main $LocalCommitSha
     Assert-LastExitCode "git update-ref refs/remotes/origin/main"
+
+    Write-Host "Recorded GitHub main SHA $ActualRemoteSha and aligned local origin/main to content-equivalent commit $LocalCommitSha." -ForegroundColor Green
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
