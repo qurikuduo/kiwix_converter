@@ -1,5 +1,13 @@
 # Kiwix Converter
 
+[![CI](https://github.com/qurikuduo/kiwix_converter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/qurikuduo/kiwix_converter/actions/workflows/ci.yml)
+[![Release Workflow](https://github.com/qurikuduo/kiwix_converter/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/qurikuduo/kiwix_converter/actions/workflows/release.yml)
+[![Latest Release](https://img.shields.io/github/v/release/qurikuduo/kiwix_converter?display_name=tag&sort=semver)](https://github.com/qurikuduo/kiwix_converter/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-F2C94C.svg)](LICENSE)
+[![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=.net)](https://dotnet.microsoft.com/download/dotnet/8.0)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20x64-0078D6?logo=windows11)](https://github.com/qurikuduo/kiwix_converter/releases/latest)
+[![UI Languages](https://img.shields.io/badge/UI%20Languages-English%20%7C%20%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87%20%7C%20%E6%97%A5%E6%9C%AC%E8%AA%9E%20%7C%20Espa%C3%B1ol%20%7C%20%D8%A7%D9%84%D8%B9%D8%B1%D8%A8%D9%8A%D8%A9-0A7C86)](#نسخ-اللغات)
+
 Kiwix Converter هو تطبيق سطح مكتب مبني على WinForms و SQLite لتحويل ملفات ZIM التي تم تنزيلها عبر kiwix-desktop إلى ملفات Markdown على مستوى المقالات وملفات JSON جاهزة لأنظمة RAG.
 
 ## نسخ اللغات
@@ -24,6 +32,19 @@ Kiwix Converter هو تطبيق سطح مكتب مبني على WinForms و SQLi
 - تحتاج إلى .NET 8 Desktop Runtime لتشغيل النسخة المعبأة من التطبيق
 - تحتاج إلى .NET 8 SDK إذا كنت ستبني المشروع من المصدر
 - توفر `zimdump` في `PATH` أو تحديد مساره من داخل الواجهة
+
+## ملفات تشغيل سطح المكتب
+
+- يحاول التطبيق المعبأ حفظ بيانات التشغيل بجانب ملف EXE حتى تبقى الحزمة قابلة للحمل وسهلة الفحص.
+- يتم حفظ إعدادات SQLite وحالة المهام في `data/kiwix-converter.db`.
+- تتم كتابة سجلات بدء التشغيل والتتبع أثناء التشغيل في `logs/kiwix-converter-YYYY-MM-DD.log`.
+- إذا كان مجلد النشر غير قابل للكتابة، يعود التطبيق إلى `%LocalAppData%\KiwixConverter`.
+
+## لقطة شاشة
+
+توضح الصورة التالية الواجهة الحقيقية الملتقطة من نسخة Windows المنشورة الحالية.
+
+![النافذة الرئيسية لتطبيق Kiwix Converter](docs/images/app-main-window.png)
 
 ## تصميم البنية
 
@@ -117,3 +138,7 @@ Kiwix Converter هو تطبيق سطح مكتب مبني على WinForms و SQLi
 
 - يتم حفظ صفحات الويكي متعددة اللغات في [docs/wiki](docs/wiki).
 - تتضمن حالياً صفحة رئيسية وصفحة خاصة بعملية الإصدار باللغات الإنجليزية والصينية واليابانية والإسبانية والعربية.
+
+## الترخيص
+
+هذا المشروع متاح بموجب ترخيص MIT. راجع [LICENSE](LICENSE).

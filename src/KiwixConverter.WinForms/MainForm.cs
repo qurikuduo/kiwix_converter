@@ -1171,14 +1171,14 @@ public sealed partial class MainForm : Form
         var taskId = GetSelectedTaskId();
         if (taskId is null)
         {
-            MessageBox.Show(this, "Select a task row first.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, T("Select a task row first."), T("No Selection"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
-        SetStatus("Pausing selected task...");
+        SetStatus(T("Pausing selected task..."));
         await _appService.PauseTaskAsync(taskId.Value);
         await RefreshAllViewsAsync();
-        SetStatus("Task paused.");
+        SetStatus(T("Task paused."));
     }
 
     private async Task ResumeSelectedTaskAsync()
@@ -1186,14 +1186,14 @@ public sealed partial class MainForm : Form
         var taskId = GetSelectedTaskId();
         if (taskId is null)
         {
-            MessageBox.Show(this, "Select a task row first.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, T("Select a task row first."), T("No Selection"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
-        SetStatus("Resuming selected task...");
+        SetStatus(T("Resuming selected task..."));
         await _appService.ResumeTaskAsync(taskId.Value);
         await RefreshAllViewsAsync();
-        SetStatus("Task resumed.");
+        SetStatus(T("Task resumed."));
     }
 
     private async void OnMainFormClosingAsync(object? sender, FormClosingEventArgs e)

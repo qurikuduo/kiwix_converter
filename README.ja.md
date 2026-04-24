@@ -1,5 +1,13 @@
 # Kiwix Converter
 
+[![CI](https://github.com/qurikuduo/kiwix_converter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/qurikuduo/kiwix_converter/actions/workflows/ci.yml)
+[![Release Workflow](https://github.com/qurikuduo/kiwix_converter/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/qurikuduo/kiwix_converter/actions/workflows/release.yml)
+[![Latest Release](https://img.shields.io/github/v/release/qurikuduo/kiwix_converter?display_name=tag&sort=semver)](https://github.com/qurikuduo/kiwix_converter/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-F2C94C.svg)](LICENSE)
+[![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=.net)](https://dotnet.microsoft.com/download/dotnet/8.0)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20x64-0078D6?logo=windows11)](https://github.com/qurikuduo/kiwix_converter/releases/latest)
+[![UI Languages](https://img.shields.io/badge/UI%20Languages-English%20%7C%20%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87%20%7C%20%E6%97%A5%E6%9C%AC%E8%AA%9E%20%7C%20Espa%C3%B1ol%20%7C%20%D8%A7%D9%84%D8%B9%D8%B1%D8%A8%D9%8A%D8%A9-0A7C86)](#言語版)
+
 Kiwix Converter は、kiwix-desktop でダウンロードした ZIM アーカイブを、記事単位の Markdown と RAG 向け JSON に変換する WinForms + SQLite デスクトップアプリです。
 
 ## 言語版
@@ -24,6 +32,19 @@ Kiwix Converter は、kiwix-desktop でダウンロードした ZIM アーカイ
 - パッケージ版アプリを実行する場合は .NET 8 Desktop Runtime
 - ソースからビルドする場合は .NET 8 SDK
 - `zimdump` が `PATH` にある、またはアプリからパス指定できること
+
+## デスクトップ実行ファイル
+
+- パッケージ版デスクトップアプリは、持ち運びと確認がしやすいよう、実行時データをできるだけ EXE と同じフォルダー側に保存します。
+- SQLite の設定とタスク状態は `data/kiwix-converter.db` に保存されます。
+- 起動時と実行時のトレースログは `logs/kiwix-converter-YYYY-MM-DD.log` に書き込まれます。
+- パッケージフォルダーが書き込み不可の場合は `%LocalAppData%\KiwixConverter` にフォールバックします。
+
+## スクリーンショット
+
+以下は現在の Windows 公開ビルドから取得した実際の画面です。
+
+![Kiwix Converter メインウィンドウ](docs/images/app-main-window.png)
 
 ## アーキテクチャ設計
 
@@ -117,3 +138,7 @@ Windows での一般的な手順:
 
 - 多言語 Wiki の原稿は [docs/wiki](docs/wiki) にあります。
 - 現在はホームページとリリース手順を、英語・中国語・日本語・スペイン語・アラビア語で提供しています。
+
+## ライセンス
+
+このプロジェクトは MIT License の下で公開されています。詳細は [LICENSE](LICENSE) を参照してください。
