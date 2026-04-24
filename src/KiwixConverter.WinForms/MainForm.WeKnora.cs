@@ -6,6 +6,8 @@ namespace KiwixConverter.WinForms;
 public sealed partial class MainForm
 {
     private const int DefaultWeKnoraSyncUpperSplitterDistance = 230;
+    private const int DefaultWeKnoraSyncUpperPanel1MinSize = 140;
+    private const int DefaultWeKnoraSyncUpperPanel2MinSize = 180;
 
     private readonly TextBox _weKnoraBaseUrlTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "http://localhost:8080" };
     private readonly TextBox _weKnoraAccessTokenTextBox = new() { Dock = DockStyle.Fill, UseSystemPasswordChar = true };
@@ -40,10 +42,7 @@ public sealed partial class MainForm
     private readonly SplitContainer _weKnoraSyncUpperSplitContainer = new()
     {
         Dock = DockStyle.Fill,
-        Orientation = Orientation.Horizontal,
-        Panel1MinSize = 140,
-        Panel2MinSize = 180,
-        SplitterDistance = DefaultWeKnoraSyncUpperSplitterDistance
+        Orientation = Orientation.Horizontal
     };
 
     private readonly ProgressBar _weKnoraSyncProgressBar = new() { Dock = DockStyle.Top, Height = 18, Minimum = 0, Maximum = 100, Style = ProgressBarStyle.Continuous };
@@ -307,6 +306,9 @@ public sealed partial class MainForm
 
     private void ApplyWeKnoraSyncUpperSplitterDistance(int requestedSplitterDistance)
     {
+        _weKnoraSyncUpperSplitContainer.Panel1MinSize = DefaultWeKnoraSyncUpperPanel1MinSize;
+        _weKnoraSyncUpperSplitContainer.Panel2MinSize = DefaultWeKnoraSyncUpperPanel2MinSize;
+
         if (_weKnoraSyncUpperSplitContainer.Height <= 0)
         {
             return;
