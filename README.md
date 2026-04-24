@@ -25,6 +25,13 @@ Kiwix Converter is a WinForms + SQLite desktop application for exporting kiwix-d
 - When the system language is not one of the supported languages, the app falls back to English.
 - Arabic uses a right-to-left shell layout automatically.
 
+## Desktop Runtime Files
+
+- The packaged desktop app now prefers portable runtime storage beside the executable so testing builds are self-contained and easy to inspect.
+- SQLite settings and task state are stored in `data/kiwix-converter.db` next to the EXE when that directory is writable.
+- Startup and runtime trace logs are written to `logs/kiwix-converter-YYYY-MM-DD.log` next to the EXE when that directory is writable.
+- If the packaged directory is not writable, the app falls back to `%LocalAppData%\KiwixConverter` for the same SQLite and log files.
+
 ## Solution Layout
 
 ```text
