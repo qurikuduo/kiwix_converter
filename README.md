@@ -1,5 +1,13 @@
 # Kiwix Converter
 
+[![CI](https://github.com/qurikuduo/kiwix_converter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/qurikuduo/kiwix_converter/actions/workflows/ci.yml)
+[![Release Workflow](https://github.com/qurikuduo/kiwix_converter/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/qurikuduo/kiwix_converter/actions/workflows/release.yml)
+[![Latest Release](https://img.shields.io/github/v/release/qurikuduo/kiwix_converter?display_name=tag&sort=semver)](https://github.com/qurikuduo/kiwix_converter/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-F2C94C.svg)](LICENSE)
+[![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=.net)](https://dotnet.microsoft.com/download/dotnet/8.0)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20x64-0078D6?logo=windows11)](https://github.com/qurikuduo/kiwix_converter/releases/latest)
+[![UI Languages](https://img.shields.io/badge/UI%20Languages-English%20%7C%20%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87%20%7C%20%E6%97%A5%E6%9C%AC%E8%AA%9E%20%7C%20Espa%C3%B1ol%20%7C%20%D8%A7%D9%84%D8%B9%D8%B1%D8%A8%D9%8A%D8%A9-0A7C86)](#language-editions)
+
 Kiwix Converter is a WinForms + SQLite desktop application for exporting kiwix-desktop downloaded ZIM archives into article-level Markdown and RAG-ready JSON artifacts.
 
 ## Language Editions
@@ -31,6 +39,12 @@ Kiwix Converter is a WinForms + SQLite desktop application for exporting kiwix-d
 - SQLite settings and task state are stored in `data/kiwix-converter.db` next to the EXE when that directory is writable.
 - Startup and runtime trace logs are written to `logs/kiwix-converter-YYYY-MM-DD.log` next to the EXE when that directory is writable.
 - If the packaged directory is not writable, the app falls back to `%LocalAppData%\KiwixConverter` for the same SQLite and log files.
+
+## Screenshot
+
+Captured from the current Windows published build after startup and localization regression validation.
+
+![Kiwix Converter main window](docs/images/app-main-window.png)
 
 ## Solution Layout
 
@@ -204,3 +218,7 @@ Image export failures are also logged and skipped without stopping the task.
 ## Verification Notes
 
 This workspace was created in an environment that has .NET runtimes installed but no .NET SDK. Because of that, the solution structure and source code were statically validated with editor diagnostics, but `dotnet restore` and `dotnet build` could not be executed here.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
