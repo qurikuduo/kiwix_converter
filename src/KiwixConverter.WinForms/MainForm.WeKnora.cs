@@ -5,15 +5,11 @@ namespace KiwixConverter.WinForms;
 
 public sealed partial class MainForm
 {
-    private const int DefaultWeKnoraSyncUpperSplitterDistance = 230;
-    private const int DefaultWeKnoraSyncUpperPanel1MinSize = 140;
-    private const int DefaultWeKnoraSyncUpperPanel2MinSize = 180;
-
     private readonly TextBox _weKnoraBaseUrlTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "http://localhost:8080" };
     private readonly TextBox _weKnoraAccessTokenTextBox = new() { Dock = DockStyle.Fill, UseSystemPasswordChar = true };
-    private readonly TextBox _weKnoraKnowledgeBaseNameTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = T("Existing or new knowledge base name") };
-    private readonly TextBox _weKnoraKnowledgeBaseIdTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = T("Optional explicit knowledge base ID") };
-    private readonly TextBox _weKnoraKnowledgeBaseDescriptionTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = T("Description used when creating a new knowledge base") };
+    private readonly TextBox _weKnoraKnowledgeBaseNameTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Existing or new knowledge base name" };
+    private readonly TextBox _weKnoraKnowledgeBaseIdTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Optional explicit knowledge base ID" };
+    private readonly TextBox _weKnoraKnowledgeBaseDescriptionTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Description used when creating a new knowledge base" };
     private readonly ComboBox _weKnoraChatModelIdComboBox = CreateWeKnoraModelComboBox();
     private readonly ComboBox _weKnoraEmbeddingModelIdComboBox = CreateWeKnoraModelComboBox();
     private readonly ComboBox _weKnoraMultimodalModelIdComboBox = CreateWeKnoraModelComboBox();
@@ -21,20 +17,20 @@ public sealed partial class MainForm
     private readonly ComboBox _weKnoraKnowledgeBaseComboBox = new() { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly NumericUpDown _weKnoraChunkSizeUpDown = new() { Dock = DockStyle.Fill, Minimum = 100, Maximum = 8192, Increment = 100, Value = 1000 };
     private readonly NumericUpDown _weKnoraChunkOverlapUpDown = new() { Dock = DockStyle.Fill, Minimum = 0, Maximum = 4096, Increment = 50, Value = 200 };
-    private readonly CheckBox _weKnoraAutoCreateKnowledgeBaseCheckBox = new() { Text = T("Auto-create the knowledge base when the configured name does not exist"), AutoSize = true, Checked = true };
-    private readonly CheckBox _weKnoraAppendMetadataCheckBox = new() { Text = T("Append export metadata to the synced Markdown content"), AutoSize = true, Checked = true };
-    private readonly CheckBox _weKnoraEnableParentChildCheckBox = new() { Text = T("Enable parent-child chunking for newly created knowledge bases"), AutoSize = true };
-    private readonly Button _testWeKnoraConnectionButton = new() { Text = T("Test Connection"), AutoSize = true };
-    private readonly Button _loadWeKnoraKnowledgeBasesButton = new() { Text = T("Load Knowledge Bases"), AutoSize = true };
-    private readonly Button _loadWeKnoraModelsButton = new() { Text = T("Load Models"), AutoSize = true };
-    private readonly Button _createWeKnoraKnowledgeBaseButton = new() { Text = T("Create KB"), AutoSize = true };
-    private readonly Button _startWeKnoraSyncButton = new() { Text = T("Sync Selected Archives"), AutoSize = true };
-    private readonly Button _pauseWeKnoraSyncButton = new() { Text = T("Pause Selected Sync"), AutoSize = true };
-    private readonly Button _resumeWeKnoraSyncButton = new() { Text = T("Resume Selected Sync"), AutoSize = true };
-    private readonly Button _refreshWeKnoraSyncButton = new() { Text = T("Refresh Sync View"), AutoSize = true };
-    private readonly TextBox _weKnoraSyncSearchTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = T("Search sync tasks by archive, knowledge base, status or error...") };
-    private readonly TextBox _weKnoraSyncLogSearchTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = T("Search WeKnora sync logs by message or article URL...") };
-    private readonly CheckBox _selectedWeKnoraSyncLogsOnlyCheckBox = new() { Text = T("Selected sync only"), AutoSize = true };
+    private readonly CheckBox _weKnoraAutoCreateKnowledgeBaseCheckBox = new() { Text = "Auto-create the knowledge base when the configured name does not exist", AutoSize = true, Checked = true };
+    private readonly CheckBox _weKnoraAppendMetadataCheckBox = new() { Text = "Append export metadata to the synced Markdown content", AutoSize = true, Checked = true };
+    private readonly CheckBox _weKnoraEnableParentChildCheckBox = new() { Text = "Enable parent-child chunking for newly created knowledge bases", AutoSize = true };
+    private readonly Button _testWeKnoraConnectionButton = new() { Text = "Test Connection", AutoSize = true };
+    private readonly Button _loadWeKnoraKnowledgeBasesButton = new() { Text = "Load Knowledge Bases", AutoSize = true };
+    private readonly Button _loadWeKnoraModelsButton = new() { Text = "Load Models", AutoSize = true };
+    private readonly Button _createWeKnoraKnowledgeBaseButton = new() { Text = "Create KB", AutoSize = true };
+    private readonly Button _startWeKnoraSyncButton = new() { Text = "Sync Selected Archives", AutoSize = true };
+    private readonly Button _pauseWeKnoraSyncButton = new() { Text = "Pause Selected Sync", AutoSize = true };
+    private readonly Button _resumeWeKnoraSyncButton = new() { Text = "Resume Selected Sync", AutoSize = true };
+    private readonly Button _refreshWeKnoraSyncButton = new() { Text = "Refresh Sync View", AutoSize = true };
+    private readonly TextBox _weKnoraSyncSearchTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Search sync tasks by archive, knowledge base, status or error..." };
+    private readonly TextBox _weKnoraSyncLogSearchTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Search WeKnora sync logs by message or article URL..." };
+    private readonly CheckBox _selectedWeKnoraSyncLogsOnlyCheckBox = new() { Text = "Selected sync only", AutoSize = true };
 
     private readonly DataGridView _weKnoraSyncCandidatesGrid = CreateGrid();
     private readonly DataGridView _weKnoraSyncTasksGrid = CreateGrid();
@@ -42,11 +38,12 @@ public sealed partial class MainForm
     private readonly SplitContainer _weKnoraSyncUpperSplitContainer = new()
     {
         Dock = DockStyle.Fill,
-        Orientation = Orientation.Horizontal
+        Orientation = Orientation.Horizontal,
+        SplitterDistance = 230
     };
 
     private readonly ProgressBar _weKnoraSyncProgressBar = new() { Dock = DockStyle.Top, Height = 18, Minimum = 0, Maximum = 100, Style = ProgressBarStyle.Continuous };
-    private readonly Label _weKnoraSyncSummaryLabel = new() { Dock = DockStyle.Top, AutoSize = true, Text = T("No WeKnora sync task selected.") };
+    private readonly Label _weKnoraSyncSummaryLabel = new() { Dock = DockStyle.Top, AutoSize = true, Text = "No WeKnora sync task selected." };
 
     private List<WeKnoraKnowledgeBaseInfo> _loadedKnowledgeBases = [];
     private List<WeKnoraModelInfo> _loadedWeKnoraModels = [];
@@ -79,7 +76,7 @@ public sealed partial class MainForm
     {
         var group = new GroupBox
         {
-            Text = T("WeKnora Sync Configuration"),
+            Text = "WeKnora Sync Configuration",
             Dock = DockStyle.Top,
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink
@@ -97,18 +94,18 @@ public sealed partial class MainForm
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        AddLabeledRow(table, 0, T("Base URL"), _weKnoraBaseUrlTextBox, new Label { Text = T("The app accepts either the root URL or a full /api/v1 URL."), AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
-        AddLabeledRow(table, 1, T("Auth Mode"), _weKnoraAuthModeComboBox, new Label { Text = T("Use API Key for tenant keys or Bearer Token for JWT-style deployments."), AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
-        AddLabeledRow(table, 2, T("Access Token"), _weKnoraAccessTokenTextBox, _testWeKnoraConnectionButton);
-        AddLabeledRow(table, 3, T("Knowledge Base"), _weKnoraKnowledgeBaseComboBox, _loadWeKnoraKnowledgeBasesButton);
-        AddLabeledRow(table, 4, T("KB Name"), _weKnoraKnowledgeBaseNameTextBox, _createWeKnoraKnowledgeBaseButton);
-        AddLabeledRow(table, 5, T("KB ID"), _weKnoraKnowledgeBaseIdTextBox, new Label { Text = T("Optional exact target. Leave empty to match by name."), AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
-        AddLabeledRow(table, 6, T("KB Description"), _weKnoraKnowledgeBaseDescriptionTextBox, new Label { Text = T("Used when creating or auto-creating a knowledge base."), AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
-        AddLabeledRow(table, 7, T("Chunk Size"), _weKnoraChunkSizeUpDown, new Label { Text = T("Chunk size for new knowledge bases."), AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
-        AddLabeledRow(table, 8, T("Chunk Overlap"), _weKnoraChunkOverlapUpDown, new Label { Text = T("Overlap applied between adjacent chunks."), AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
-        AddLabeledRow(table, 9, T("Chat Model ID"), _weKnoraChatModelIdComboBox, _loadWeKnoraModelsButton);
-        AddLabeledRow(table, 10, T("Embedding Model ID"), _weKnoraEmbeddingModelIdComboBox, new Label { Text = T("Optional Embedding model from /api/v1/models. Leave empty to use the server default."), AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
-        AddLabeledRow(table, 11, T("Multimodal ID"), _weKnoraMultimodalModelIdComboBox, new Label { Text = T("Optional VLLM model from /api/v1/models."), AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
+        AddLabeledRow(table, 0, "Base URL", _weKnoraBaseUrlTextBox, new Label { Text = "The app accepts either the root URL or a full /api/v1 URL.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
+        AddLabeledRow(table, 1, "Auth Mode", _weKnoraAuthModeComboBox, new Label { Text = "Use API Key for tenant keys or Bearer Token for JWT-style deployments.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
+        AddLabeledRow(table, 2, "Access Token", _weKnoraAccessTokenTextBox, _testWeKnoraConnectionButton);
+        AddLabeledRow(table, 3, "Knowledge Base", _weKnoraKnowledgeBaseComboBox, _loadWeKnoraKnowledgeBasesButton);
+        AddLabeledRow(table, 4, "KB Name", _weKnoraKnowledgeBaseNameTextBox, _createWeKnoraKnowledgeBaseButton);
+        AddLabeledRow(table, 5, "KB ID", _weKnoraKnowledgeBaseIdTextBox, new Label { Text = "Optional exact target. Leave empty to match by name.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
+        AddLabeledRow(table, 6, "KB Description", _weKnoraKnowledgeBaseDescriptionTextBox, new Label { Text = "Used when creating or auto-creating a knowledge base.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
+        AddLabeledRow(table, 7, "Chunk Size", _weKnoraChunkSizeUpDown, new Label { Text = "Chunk size for new knowledge bases.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
+        AddLabeledRow(table, 8, "Chunk Overlap", _weKnoraChunkOverlapUpDown, new Label { Text = "Overlap applied between adjacent chunks.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
+        AddLabeledRow(table, 9, "Chat Model ID", _weKnoraChatModelIdComboBox, _loadWeKnoraModelsButton);
+        AddLabeledRow(table, 10, "Embedding Model ID", _weKnoraEmbeddingModelIdComboBox, new Label { Text = "Optional Embedding model from /api/v1/models. Leave empty to use the server default.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
+        AddLabeledRow(table, 11, "Multimodal ID", _weKnoraMultimodalModelIdComboBox, new Label { Text = "Optional VLLM model from /api/v1/models.", AutoSize = true, Anchor = AnchorStyles.Left, MaximumSize = new Size(260, 0) });
 
         var optionsPanel = new FlowLayoutPanel
         {
@@ -126,7 +123,7 @@ public sealed partial class MainForm
 
         var helperLabel = new Label
         {
-            Text = T("Choose an existing knowledge base from the server, or type a new KB name and click Create KB. New knowledge bases use the description, chunk size, chunk overlap, and parent-child settings above. Use Load Models to fetch live KnowledgeQA, Embedding, and VLLM model IDs from WeKnora before creating a KB or starting a sync."),
+            Text = "Choose an existing knowledge base from the server, or type a new KB name and click Create KB. New knowledge bases use the description, chunk size, chunk overlap, and parent-child settings above. Use Load Models to fetch live KnowledgeQA, Embedding, and VLLM model IDs from WeKnora before creating a KB or starting a sync.",
             Dock = DockStyle.Fill,
             AutoSize = true,
             MaximumSize = new Size(430, 0),
@@ -141,7 +138,7 @@ public sealed partial class MainForm
 
     private TabPage BuildWeKnoraSyncTab()
     {
-        var tab = new TabPage(T("WeKnora Sync"));
+        var tab = new TabPage("WeKnora Sync");
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -156,7 +153,7 @@ public sealed partial class MainForm
 
         root.Controls.Add(new Label
         {
-            Text = T("Select one or more completed conversion outputs, start a sync, then watch progress, ETA, logs, and resume state from the same screen."),
+            Text = "Select one or more completed conversion outputs, start a sync, then watch progress, ETA, logs, and resume state from the same screen.",
             Dock = DockStyle.Top,
             AutoSize = true,
             MaximumSize = new Size(880, 0)
@@ -180,7 +177,7 @@ public sealed partial class MainForm
         controlsPanel.Controls.Add(_pauseWeKnoraSyncButton, 2, 0);
         controlsPanel.Controls.Add(_resumeWeKnoraSyncButton, 3, 0);
         controlsPanel.Controls.Add(_refreshWeKnoraSyncButton, 4, 0);
-        controlsPanel.Controls.Add(new Label { Text = T("Select rows in the candidate grid to create sync tasks."), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(12, 8, 0, 0) }, 5, 0);
+        controlsPanel.Controls.Add(new Label { Text = "Select rows in the candidate grid to create sync tasks.", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(12, 8, 0, 0) }, 5, 0);
         root.Controls.Add(controlsPanel, 0, 1);
 
         _weKnoraSyncUpperSplitContainer.Panel1.Controls.Add(BuildWeKnoraCandidatesGroup());
@@ -197,7 +194,7 @@ public sealed partial class MainForm
     {
         var group = new GroupBox
         {
-            Text = T("Converted Archives Ready To Sync"),
+            Text = "Converted Archives Ready To Sync",
             Dock = DockStyle.Fill
         };
 
@@ -212,7 +209,7 @@ public sealed partial class MainForm
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.Controls.Add(new Label
         {
-            Text = T("Each row represents a completed conversion task. The sync task will upload every completed article export from the selected archive to the configured WeKnora knowledge base."),
+            Text = "Each row represents a completed conversion task. The sync task will upload every completed article export from the selected archive to the configured WeKnora knowledge base.",
             AutoSize = true,
             Dock = DockStyle.Top,
             MaximumSize = new Size(860, 0)
@@ -226,7 +223,7 @@ public sealed partial class MainForm
     {
         var group = new GroupBox
         {
-            Text = T("WeKnora Sync Tasks"),
+            Text = "WeKnora Sync Tasks",
             Dock = DockStyle.Fill
         };
 
@@ -252,7 +249,7 @@ public sealed partial class MainForm
     {
         var group = new GroupBox
         {
-            Text = T("WeKnora Sync Logs"),
+            Text = "WeKnora Sync Logs",
             Dock = DockStyle.Fill
         };
 
@@ -278,11 +275,11 @@ public sealed partial class MainForm
         filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        filterPanel.Controls.Add(new Label { Text = T("Search"), Anchor = AnchorStyles.Left, AutoSize = true }, 0, 0);
+        filterPanel.Controls.Add(new Label { Text = "Search", Anchor = AnchorStyles.Left, AutoSize = true }, 0, 0);
         filterPanel.Controls.Add(_weKnoraSyncLogSearchTextBox, 1, 0);
         filterPanel.Controls.Add(_selectedWeKnoraSyncLogsOnlyCheckBox, 2, 0);
-        filterPanel.Controls.Add(new Label { Text = T("Select a sync task row to scope logs."), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(12, 8, 0, 0) }, 3, 0);
-        filterPanel.Controls.Add(new Label { Text = T("Use Refresh Sync View after changing filters."), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(12, 8, 0, 0) }, 4, 0);
+        filterPanel.Controls.Add(new Label { Text = "Select a sync task row to scope logs.", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(12, 8, 0, 0) }, 3, 0);
+        filterPanel.Controls.Add(new Label { Text = "Use Refresh Sync View after changing filters.", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(12, 8, 0, 0) }, 4, 0);
 
         layout.Controls.Add(filterPanel, 0, 0);
         layout.Controls.Add(_weKnoraSyncLogsGrid, 0, 1);
@@ -304,35 +301,6 @@ public sealed partial class MainForm
         _weKnoraSyncTasksGrid.SelectionChanged += (_, _) => UpdateWeKnoraSyncSummary();
     }
 
-    private void ApplyWeKnoraSyncUpperSplitterDistance(int requestedSplitterDistance)
-    {
-        _weKnoraSyncUpperSplitContainer.Panel1MinSize = DefaultWeKnoraSyncUpperPanel1MinSize;
-        _weKnoraSyncUpperSplitContainer.Panel2MinSize = DefaultWeKnoraSyncUpperPanel2MinSize;
-
-        if (_weKnoraSyncUpperSplitContainer.Height <= 0)
-        {
-            return;
-        }
-
-        var maxSplitterDistance = _weKnoraSyncUpperSplitContainer.Height - _weKnoraSyncUpperSplitContainer.Panel2MinSize;
-        if (maxSplitterDistance < _weKnoraSyncUpperSplitContainer.Panel1MinSize)
-        {
-            return;
-        }
-
-        var preferredSplitterDistance = requestedSplitterDistance > 0
-            ? requestedSplitterDistance
-            : DefaultWeKnoraSyncUpperSplitterDistance;
-        var desiredSplitterDistance = Math.Max(
-            _weKnoraSyncUpperSplitContainer.Panel1MinSize,
-            Math.Min(preferredSplitterDistance, maxSplitterDistance));
-
-        if (_weKnoraSyncUpperSplitContainer.SplitterDistance != desiredSplitterDistance)
-        {
-            _weKnoraSyncUpperSplitContainer.SplitterDistance = desiredSplitterDistance;
-        }
-    }
-
     private async Task EnsureZimdumpAvailableAsync()
     {
         using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(EnsureZimdumpAvailableAsync), new
@@ -345,15 +313,15 @@ public sealed partial class MainForm
             var availability = await _appService.GetZimdumpAvailabilityAsync();
             if (availability.IsAvailable)
             {
-                SetStatus(TF("zimdump ready: {0}", availability.Version));
+                SetStatus($"zimdump ready: {availability.Version}");
                 scope.Success(SummarizeToolAvailability(availability));
                 return;
             }
 
             var result = MessageBox.Show(
                 this,
-                TF("zimdump was not detected.\n\nCurrent check result: {0}\n\nTo fix this:\n1. Install zimdump from the openZIM zim-tools package.\n2. Add the folder containing zimdump.exe to PATH, or browse directly to zimdump.exe below.\n3. Save settings and retry.\n\nChoose Yes to locate zimdump.exe now, or No to continue with limited functionality.", availability.Message),
-                T("zimdump Not Found"),
+                $"zimdump was not detected.\n\nCurrent check result: {availability.Message}\n\nTo fix this:\n1. Install zimdump from the openZIM zim-tools package.\n2. Add the folder containing zimdump.exe to PATH, or browse directly to zimdump.exe below.\n3. Save settings and retry.\n\nChoose Yes to locate zimdump.exe now, or No to continue with limited functionality.",
+                "zimdump Not Found",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning);
 
@@ -365,7 +333,7 @@ public sealed partial class MainForm
 
             if (result != DialogResult.Yes)
             {
-                SetStatus(T("zimdump not configured. Conversion and metadata extraction will stay unavailable until it is configured."));
+                SetStatus("zimdump not configured. Conversion and metadata extraction will stay unavailable until it is configured.");
                 scope.Success(new
                 {
                     availability = SummarizeToolAvailability(availability),
@@ -380,7 +348,7 @@ public sealed partial class MainForm
             var retryAvailability = await _appService.GetZimdumpAvailabilityAsync();
             if (retryAvailability.IsAvailable)
             {
-                SetStatus(TF("zimdump ready: {0}", retryAvailability.Version));
+                SetStatus($"zimdump ready: {retryAvailability.Version}");
                 scope.Success(new
                 {
                     availability = SummarizeToolAvailability(retryAvailability),
@@ -389,8 +357,8 @@ public sealed partial class MainForm
                 return;
             }
 
-            MessageBox.Show(this, retryAvailability.Message ?? T("zimdump is still unavailable."), T("zimdump Check Failed"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            SetStatus(T("zimdump still not configured. Please correct the path or PATH environment variable."));
+            MessageBox.Show(this, retryAvailability.Message ?? "zimdump is still unavailable.", "zimdump Check Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            SetStatus("zimdump still not configured. Please correct the path or PATH environment variable.");
             scope.Success(new
             {
                 availability = SummarizeToolAvailability(retryAvailability),
@@ -442,7 +410,7 @@ public sealed partial class MainForm
             await SaveSettingsAsync(silent: true);
             var result = await _appService.TestWeKnoraConnectionAsync();
             var icon = result.IsAvailable ? MessageBoxIcon.Information : MessageBoxIcon.Warning;
-            MessageBox.Show(this, result.Message ?? T("No response received."), result.IsAvailable ? T("WeKnora Connection OK") : T("WeKnora Connection Failed"), MessageBoxButtons.OK, icon);
+            MessageBox.Show(this, result.Message ?? "No response received.", result.IsAvailable ? "WeKnora Connection OK" : "WeKnora Connection Failed", MessageBoxButtons.OK, icon);
 
             if (result.IsAvailable)
             {
@@ -475,7 +443,7 @@ public sealed partial class MainForm
 
             if (!silent)
             {
-                SetStatus(TF("Loaded {0} WeKnora knowledge base(s).", knowledgeBases.Count));
+                SetStatus($"Loaded {knowledgeBases.Count} WeKnora knowledge base(s).");
             }
 
             scope.Success(new
@@ -504,7 +472,7 @@ public sealed partial class MainForm
 
             if (!silent)
             {
-                SetStatus(TF("Loaded {0} WeKnora model(s).", models.Count));
+                SetStatus($"Loaded {models.Count} WeKnora model(s).");
             }
 
             scope.Success(new
@@ -582,7 +550,7 @@ public sealed partial class MainForm
         choices.Insert(0, new ModelChoice
         {
             Id = string.Empty,
-            DisplayText = T("(Use server default or leave empty)")
+            DisplayText = "(Use server default or leave empty)"
         });
 
         comboBox.DisplayMember = nameof(ModelChoice.DisplayText);
@@ -621,7 +589,7 @@ public sealed partial class MainForm
 
         if (model.IsDefault)
         {
-            details.Add(T("default"));
+            details.Add("default");
         }
 
         return details.Count == 0
@@ -641,7 +609,7 @@ public sealed partial class MainForm
         }
 
         var rawValue = comboBox.Text.Trim();
-        return string.IsNullOrWhiteSpace(rawValue) || rawValue.StartsWith(T("(Use server default or leave empty)"), StringComparison.OrdinalIgnoreCase)
+        return string.IsNullOrWhiteSpace(rawValue) || rawValue.StartsWith("(Use server default", StringComparison.OrdinalIgnoreCase)
             ? null
             : rawValue;
     }
@@ -657,7 +625,7 @@ public sealed partial class MainForm
         var knowledgeBaseName = _weKnoraKnowledgeBaseNameTextBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(knowledgeBaseName))
         {
-            MessageBox.Show(this, T("Enter a knowledge base name before creating it."), T("Knowledge Base Name Required"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Enter a knowledge base name before creating it.", "Knowledge Base Name Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
             scope.Success(new { created = false, reason = "Knowledge base name missing" });
             return;
         }
@@ -677,7 +645,7 @@ public sealed partial class MainForm
                 _weKnoraKnowledgeBaseComboBox.SelectedIndex = selectedIndex;
             }
 
-            SetStatus(TF("Created WeKnora knowledge base '{0}'.", created.Name));
+            SetStatus($"Created WeKnora knowledge base '{created.Name}'.");
             scope.Success(new
             {
                 created = true,
@@ -697,7 +665,7 @@ public sealed partial class MainForm
         var sourceTaskIds = GetSelectedWeKnoraSourceTaskIds();
         if (sourceTaskIds.Count == 0)
         {
-            MessageBox.Show(this, T("Select one or more completed conversion rows in the 'Converted Archives Ready To Sync' grid first."), T("No Sync Source Selected"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Select one or more completed conversion rows in the 'Converted Archives Ready To Sync' grid first.", "No Sync Source Selected", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -708,7 +676,7 @@ public sealed partial class MainForm
         }
 
         await RefreshAllViewsAsync();
-        SetStatus(TF("Started or resumed {0} WeKnora sync task(s).", sourceTaskIds.Count));
+        SetStatus($"Started or resumed {sourceTaskIds.Count} WeKnora sync task(s).");
     }
 
     private async Task PauseSelectedWeKnoraSyncAsync()
@@ -716,13 +684,13 @@ public sealed partial class MainForm
         var syncTaskId = GetSelectedWeKnoraSyncTaskId();
         if (syncTaskId is null)
         {
-            MessageBox.Show(this, T("Select a WeKnora sync task row first."), T("No Sync Task Selected"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Select a WeKnora sync task row first.", "No Sync Task Selected", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
         await _appService.PauseWeKnoraSyncTaskAsync(syncTaskId.Value);
         await RefreshAllViewsAsync();
-        SetStatus(T("WeKnora sync task paused."));
+        SetStatus("WeKnora sync task paused.");
     }
 
     private async Task ResumeSelectedWeKnoraSyncAsync()
@@ -730,13 +698,13 @@ public sealed partial class MainForm
         var syncTaskId = GetSelectedWeKnoraSyncTaskId();
         if (syncTaskId is null)
         {
-            MessageBox.Show(this, T("Select a WeKnora sync task row first."), T("No Sync Task Selected"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Select a WeKnora sync task row first.", "No Sync Task Selected", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
         await _appService.ResumeWeKnoraSyncTaskAsync(syncTaskId.Value);
         await RefreshAllViewsAsync();
-        SetStatus(T("WeKnora sync task resumed."));
+        SetStatus("WeKnora sync task resumed.");
     }
 
     private void BindWeKnoraViewData(
@@ -796,12 +764,12 @@ public sealed partial class MainForm
         if (row is null)
         {
             _weKnoraSyncProgressBar.Value = 0;
-            _weKnoraSyncSummaryLabel.Text = T("No WeKnora sync task selected.");
+            _weKnoraSyncSummaryLabel.Text = "No WeKnora sync task selected.";
             return;
         }
 
         _weKnoraSyncProgressBar.Value = Math.Max(_weKnoraSyncProgressBar.Minimum, Math.Min(_weKnoraSyncProgressBar.Maximum, row.ProgressPercent));
-        _weKnoraSyncSummaryLabel.Text = TF("Archive: {0} | Target: {1} | Status: {2} | Progress: {3} | Failed: {4} | ETA: {5}", row.Archive, row.KnowledgeBase, row.Status, row.Progress, row.Failed, row.Eta);
+        _weKnoraSyncSummaryLabel.Text = $"Archive: {row.Archive} | Target: {row.KnowledgeBase} | Status: {row.Status} | Progress: {row.Progress} | Failed: {row.Failed} | ETA: {row.Eta}";
     }
 
     private List<long> GetSelectedWeKnoraSourceTaskIds()

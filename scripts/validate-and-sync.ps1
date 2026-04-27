@@ -109,6 +109,18 @@ function Update-EquivalentTrackingRefs {
     Write-Host "Recorded GitHub main SHA $ActualRemoteSha and aligned local origin/main to content-equivalent commit $LocalCommitSha." -ForegroundColor Green
 }
 
+function Get-CommandOutputLines {
+    param(
+        [scriptblock]$Command,
+        [string]$Operation
+    )
+
+    $lines = @(& $Command)
+    Assert-LastExitCode $Operation
+    $filteredLines = @($lines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    return ,$filteredLines
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $repoRoot
 
@@ -131,8 +143,35 @@ if (-not $SkipBuild) {
 $workingTreeStatus = & git status --porcelain
 Assert-LastExitCode "git status --porcelain"
 
-if ($SkipCommit -and $workingTreeStatus) {
-    throw "-SkipCommit requires a clean working tree. Commit or stash local changes before using the sync-only path."
+$stagedPaths = Get-CommandOutputLines -Command { git diff --cached --name-only --diff-filter=ACDMRTUXB } -Operation "git diff --cached --name-only"
+$unstagedPaths = Get-CommandOutputLines -Command { git diff --name-only --diff-filter=ACDMRTUXB } -Operation "git diff --name-only"
+$untrackedPaths = Get-CommandOutputLines -Command { git ls-files --others --exclude-standard } -Operation "git ls-files --others --exclude-standard"
+
+if ($SkipCommit) {
+    if ($stagedPaths.Count -gt 0) {
+        throw "-SkipCommit does not allow staged-but-uncommitted changes. Commit them first or rerun without -SkipCommit."
+    }
+
+    if ($workingTreeStatus) {
+        $headDiffPaths = Get-CommandOutputLines -Command { git diff-tree --no-commit-id --name-only -r HEAD } -Operation "git diff-tree --name-only HEAD"
+        $headDiffPathSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        foreach ($path in $headDiffPaths) {
+            $null = $headDiffPathSet.Add($path)
+        }
+
+        $overlappingDirtyPaths = [System.Collections.Generic.List[string]]::new()
+        foreach ($path in @($unstagedPaths + $untrackedPaths)) {
+            if ($headDiffPathSet.Contains($path)) {
+                $overlappingDirtyPaths.Add($path)
+            }
+        }
+
+        if ($overlappingDirtyPaths.Count -gt 0) {
+            throw "-SkipCommit cannot continue because dirty paths overlap the HEAD commit delta: $($overlappingDirtyPaths -join ', ')."
+        }
+
+        Write-Warning "The working tree is dirty, but none of the dirty paths overlap the HEAD commit delta. Continuing with the sync-only path for HEAD."
+    }
 }
 
 if (-not $SkipCommit -and $workingTreeStatus) {

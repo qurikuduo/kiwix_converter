@@ -38,9 +38,21 @@ public sealed class AppSettings
 
     public string? DefaultOutputDirectory { get; set; }
 
-    public string? ZimdumpExecutablePath { get; set; }
+    public int? MainWindowLeft { get; set; }
 
-    public string? TaskOutputOverrideDirectory { get; set; }
+    public int? MainWindowTop { get; set; }
+
+    public int? MainWindowWidth { get; set; }
+
+    public int? MainWindowHeight { get; set; }
+
+    public string? MainWindowState { get; set; }
+
+    public int? RootSplitterDistance { get; set; }
+
+    public int? WeKnoraSyncUpperSplitterDistance { get; set; }
+
+    public string? ZimdumpExecutablePath { get; set; }
 
     public int SnapshotIntervalSeconds { get; set; } = 15;
 
@@ -71,26 +83,6 @@ public sealed class AppSettings
     public bool WeKnoraAutoCreateKnowledgeBase { get; set; } = true;
 
     public bool WeKnoraAppendMetadataBlock { get; set; } = true;
-
-    public string? HistorySearchText { get; set; }
-
-    public string? LogSearchText { get; set; }
-
-    public bool SelectedTaskLogsOnly { get; set; }
-
-    public string? WeKnoraSyncSearchText { get; set; }
-
-    public string? WeKnoraSyncLogSearchText { get; set; }
-
-    public bool SelectedWeKnoraSyncLogsOnly { get; set; }
-
-    public int MainWindowWidth { get; set; } = 1760;
-
-    public int MainWindowHeight { get; set; } = 920;
-
-    public int RootSplitterDistance { get; set; } = 680;
-
-    public int WeKnoraSyncUpperSplitterDistance { get; set; } = 230;
 }
 
 public sealed class ToolAvailabilityResult

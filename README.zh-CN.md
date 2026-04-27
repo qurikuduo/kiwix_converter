@@ -1,13 +1,5 @@
 # Kiwix Converter
 
-[![CI](https://github.com/qurikuduo/kiwix_converter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/qurikuduo/kiwix_converter/actions/workflows/ci.yml)
-[![Release Workflow](https://github.com/qurikuduo/kiwix_converter/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/qurikuduo/kiwix_converter/actions/workflows/release.yml)
-[![Latest Release](https://img.shields.io/github/v/release/qurikuduo/kiwix_converter?display_name=tag&sort=semver)](https://github.com/qurikuduo/kiwix_converter/releases/latest)
-[![License: MIT](https://img.shields.io/badge/License-MIT-F2C94C.svg)](LICENSE)
-[![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=.net)](https://dotnet.microsoft.com/download/dotnet/8.0)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20x64-0078D6?logo=windows11)](https://github.com/qurikuduo/kiwix_converter/releases/latest)
-[![UI Languages](https://img.shields.io/badge/UI%20Languages-English%20%7C%20%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87%20%7C%20%E6%97%A5%E6%9C%AC%E8%AA%9E%20%7C%20Espa%C3%B1ol%20%7C%20%D8%A7%D9%84%D8%B9%D8%B1%D8%A8%D9%8A%D8%A9-0A7C86)](#语言版本)
-
 Kiwix Converter 是一个基于 WinForms + SQLite 的桌面工具，用于把 kiwix-desktop 下载的 ZIM 文件转换成按文章拆分的 Markdown 与 RAG 友好型 JSON 产物。
 
 ## 语言版本
@@ -32,19 +24,6 @@ Kiwix Converter 是一个基于 WinForms + SQLite 的桌面工具，用于把 ki
 - 运行打包后的桌面程序时需要 .NET 8 Desktop Runtime
 - 如果你要从源码编译，则需要 .NET 8 SDK
 - `zimdump` 已安装，并且在 `PATH` 中或可在界面里手动指定路径
-
-## 桌面运行文件
-
-- 打包后的桌面程序会优先把运行时数据保存到 EXE 同目录，方便携带和检查。
-- SQLite 配置与任务状态保存在 `data/kiwix-converter.db`。
-- 启动和运行跟踪日志写入 `logs/kiwix-converter-YYYY-MM-DD.log`。
-- 如果发布目录不可写，程序会回退到 `%LocalAppData%\KiwixConverter`。
-
-## 软件截图
-
-下图来自当前 Windows 发布版的真实运行界面。
-
-![Kiwix Converter 主界面](docs/images/app-main-window.png)
 
 ## 面向普通用户的快速开始
 
@@ -158,7 +137,3 @@ docs/
 
 - 多语言 wiki 内容保存在 [docs/wiki](docs/wiki) 目录下。
 - 当前已提供英文、中文、日文、西班牙文、阿拉伯文的主页与发布流程页面。
-
-## 许可证
-
-本项目使用 MIT License。详见 [LICENSE](LICENSE)。

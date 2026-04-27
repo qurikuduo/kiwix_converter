@@ -8,12 +8,6 @@ namespace KiwixConverter.WinForms;
 
 public sealed partial class MainForm : Form
 {
-    private const int DefaultWindowWidth = 1760;
-    private const int DefaultWindowHeight = 920;
-    private const int DefaultRootSplitterDistance = 680;
-
-    private static readonly UiLocalizer UiText = UiLocalizer.CreateForCurrentCulture();
-
     private readonly KiwixAppService _appService = new();
     private readonly NotifyIcon _notifyIcon = new();
     private readonly System.Windows.Forms.Timer _refreshTimer = new() { Interval = 5000 };
@@ -24,8 +18,8 @@ public sealed partial class MainForm : Form
     private readonly TextBox _zimdumpPathTextBox = new() { Dock = DockStyle.Fill };
     private readonly NumericUpDown _snapshotIntervalUpDown = new() { Minimum = 5, Maximum = 3600, Value = 15, Dock = DockStyle.Fill };
     private readonly TextBox _taskOutputOverrideTextBox = new() { Dock = DockStyle.Fill };
-    private readonly TextBox _historySearchTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = T("Search by path, status, output directory or error...") };
-    private readonly TextBox _logSearchTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = T("Search logs by message, category or article URL...") };
+    private readonly TextBox _historySearchTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Search by path, status, output directory or error..." };
+    private readonly TextBox _logSearchTextBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Search logs by message, category or article URL..." };
     private readonly SplitContainer _rootSplitContainer = new()
     {
         Dock = DockStyle.Fill,
@@ -37,22 +31,21 @@ public sealed partial class MainForm : Form
     private readonly DataGridView _historyGrid = CreateGrid();
     private readonly DataGridView _logsGrid = CreateGrid();
 
-    private readonly Button _saveSettingsButton = new() { Text = T("Save Settings"), AutoSize = true };
-    private readonly Button _scanButton = new() { Text = T("Scan ZIM Files"), AutoSize = true };
-    private readonly Button _convertButton = new() { Text = T("Convert Selected ZIM"), AutoSize = true };
-    private readonly Button _pauseTaskButton = new() { Text = T("Pause Selected Task"), AutoSize = true };
-    private readonly Button _resumeTaskButton = new() { Text = T("Resume Selected Task"), AutoSize = true };
-    private readonly Button _refreshHistoryButton = new() { Text = T("Refresh History"), AutoSize = true };
-    private readonly Button _refreshLogsButton = new() { Text = T("Refresh Logs"), AutoSize = true };
+    private readonly Button _saveSettingsButton = new() { Text = "Save Settings", AutoSize = true };
+    private readonly Button _scanButton = new() { Text = "Scan ZIM Files", AutoSize = true };
+    private readonly Button _convertButton = new() { Text = "Convert Selected ZIM", AutoSize = true };
+    private readonly Button _pauseTaskButton = new() { Text = "Pause Selected Task", AutoSize = true };
+    private readonly Button _resumeTaskButton = new() { Text = "Resume Selected Task", AutoSize = true };
+    private readonly Button _refreshHistoryButton = new() { Text = "Refresh History", AutoSize = true };
+    private readonly Button _refreshLogsButton = new() { Text = "Refresh Logs", AutoSize = true };
 
     private readonly ToolStripStatusLabel _statusLabel = new() { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
-    private readonly CheckBox _selectedTaskLogsOnlyCheckBox = new() { Text = T("Selected task only"), AutoSize = true };
+    private readonly CheckBox _selectedTaskLogsOnlyCheckBox = new() { Text = "Selected task only", AutoSize = true };
 
     private readonly HashSet<long> _knownCompletedTaskIds = [];
 
     private bool _allowClose;
     private bool _isRefreshing;
-    private int _preferredRootSplitterDistance = DefaultRootSplitterDistance;
 
     public MainForm()
     {
@@ -65,12 +58,10 @@ public sealed partial class MainForm : Form
         try
         {
             Text = BuildWindowTitle();
-            Width = DefaultWindowWidth;
-            Height = DefaultWindowHeight;
+            Width = 1760;
+            Height = 920;
             MinimumSize = new Size(1460, 760);
             StartPosition = FormStartPosition.CenterScreen;
-            RightToLeft = UiText.IsRightToLeft ? RightToLeft.Yes : RightToLeft.No;
-            RightToLeftLayout = UiText.IsRightToLeft;
 
             InitializeWeKnoraControls();
             FileTraceLogger.Info(nameof(MainForm), "Constructor STEP", new { step = nameof(InitializeWeKnoraControls) });
@@ -81,7 +72,7 @@ public sealed partial class MainForm : Form
             FileTraceLogger.Info(nameof(MainForm), "Constructor STEP", new { step = nameof(WireEvents) });
 
             _notifyIcon.Visible = true;
-            _notifyIcon.Text = T("Kiwix Converter");
+            _notifyIcon.Text = "Kiwix Converter";
 
             scope.Success(new
             {
@@ -175,16 +166,6 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private static string T(string englishText)
-    {
-        return UiText.Get(englishText);
-    }
-
-    private static string TF(string englishFormat, params object[] args)
-    {
-        return UiText.Format(englishFormat, args);
-    }
-
     private void ApplyBranding()
     {
         using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(ApplyBranding), new
@@ -215,6 +196,9 @@ public sealed partial class MainForm : Form
     }
 
     private void EnsureRootSplitterDistance()
+        => EnsureRootSplitterDistance(null);
+
+    private void EnsureRootSplitterDistance(int? preferredDistance)
     {
         const int desiredPanel1MinSize = 420;
         const int desiredPanel2MinSize = 600;
@@ -240,9 +224,8 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        var desiredSplitterDistance = Math.Max(
-            _rootSplitContainer.Panel1MinSize,
-            Math.Min(_preferredRootSplitterDistance, maxSplitterDistance));
+        var targetSplitterDistance = preferredDistance ?? 680;
+        var desiredSplitterDistance = Math.Max(_rootSplitContainer.Panel1MinSize, Math.Min(targetSplitterDistance, maxSplitterDistance));
         if (_rootSplitContainer.SplitterDistance != desiredSplitterDistance)
         {
             _rootSplitContainer.SplitterDistance = desiredSplitterDistance;
@@ -325,7 +308,7 @@ public sealed partial class MainForm : Form
             AutoSize = true,
             Dock = DockStyle.Fill,
             Margin = new Padding(0, 6, 0, 0),
-            Text = T("Kiwix Converter"),
+            Text = "Kiwix Converter",
             TextAlign = ContentAlignment.BottomLeft,
             Font = new Font("Segoe UI Semibold", 20f, FontStyle.Bold),
             ForeColor = Color.FromArgb(15, 57, 70)
@@ -336,7 +319,7 @@ public sealed partial class MainForm : Form
             AutoSize = true,
             Dock = DockStyle.Fill,
             Margin = new Padding(0, 4, 0, 0),
-            Text = T("ZIM to Markdown, RAG artifacts, and WeKnora sync"),
+            Text = "ZIM to Markdown, RAG artifacts, and WeKnora sync",
             TextAlign = ContentAlignment.MiddleLeft,
             Font = new Font("Segoe UI", 10.5f, FontStyle.Regular),
             ForeColor = Color.FromArgb(47, 87, 99)
@@ -347,7 +330,7 @@ public sealed partial class MainForm : Form
             AutoSize = true,
             Dock = DockStyle.Fill,
             Margin = new Padding(0, 8, 0, 0),
-            Text = TF("Version {0}", GetDisplayVersion()),
+            Text = $"Version {GetDisplayVersion()}",
             TextAlign = ContentAlignment.TopLeft,
             Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold),
             ForeColor = Color.FromArgb(103, 128, 138)
@@ -385,8 +368,8 @@ public sealed partial class MainForm : Form
     {
         var version = GetDisplayVersion();
         return string.IsNullOrWhiteSpace(version)
-            ? T("Kiwix Converter")
-            : TF("Kiwix Converter v{0}", version);
+            ? "Kiwix Converter"
+            : $"Kiwix Converter v{version}";
     }
 
     private static string GetDisplayVersion()
@@ -453,7 +436,7 @@ public sealed partial class MainForm : Form
     {
         var group = new GroupBox
         {
-            Text = T("Directories And Tooling"),
+            Text = "Directories And Tooling",
             Dock = DockStyle.Top,
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink
@@ -471,10 +454,10 @@ public sealed partial class MainForm : Form
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        AddStackedInputRow(table, 0, "kiwix-desktop", _kiwixDirectoryTextBox, CreateButton(T("Browse..."), (_, _) => BrowseForFolder(_kiwixDirectoryTextBox)));
-        AddStackedInputRow(table, 2, T("Default Output"), _defaultOutputDirectoryTextBox, CreateButton(T("Browse..."), (_, _) => BrowseForFolder(_defaultOutputDirectoryTextBox)));
-        AddStackedInputRow(table, 4, T("zimdump Path"), _zimdumpPathTextBox, CreateButton(T("Browse..."), (_, _) => BrowseForExecutable()));
-        AddLabeledRow(table, 6, T("Snapshot Seconds"), _snapshotIntervalUpDown, new Label { Text = T("Article-level checkpoints + periodic task snapshots"), AutoSize = true, Anchor = AnchorStyles.Left });
+        AddStackedInputRow(table, 0, "kiwix-desktop", _kiwixDirectoryTextBox, CreateButton("Browse...", (_, _) => BrowseForFolder(_kiwixDirectoryTextBox)));
+        AddStackedInputRow(table, 2, "Default Output", _defaultOutputDirectoryTextBox, CreateButton("Browse...", (_, _) => BrowseForFolder(_defaultOutputDirectoryTextBox)));
+        AddStackedInputRow(table, 4, "zimdump Path", _zimdumpPathTextBox, CreateButton("Browse...", (_, _) => BrowseForExecutable()));
+        AddLabeledRow(table, 6, "Snapshot Seconds", _snapshotIntervalUpDown, new Label { Text = "Article-level checkpoints + periodic task snapshots", AutoSize = true, Anchor = AnchorStyles.Left });
 
         var buttonPanel = new FlowLayoutPanel
         {
@@ -497,7 +480,7 @@ public sealed partial class MainForm : Form
     {
         var group = new GroupBox
         {
-            Text = T("Per-Task Output Override"),
+            Text = "Per-Task Output Override",
             Dock = DockStyle.Top,
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink
@@ -515,11 +498,11 @@ public sealed partial class MainForm : Form
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        AddStackedInputRow(table, 0, T("Output Override"), _taskOutputOverrideTextBox, CreateButton(T("Browse..."), (_, _) => BrowseForFolder(_taskOutputOverrideTextBox)));
+        AddStackedInputRow(table, 0, "Output Override", _taskOutputOverrideTextBox, CreateButton("Browse...", (_, _) => BrowseForFolder(_taskOutputOverrideTextBox)));
 
         var helperLabel = new Label
         {
-            Text = T("Leave empty to use the default output directory. Each ZIM is exported into its own subdirectory."),
+            Text = "Leave empty to use the default output directory. Each ZIM is exported into its own subdirectory.",
             Dock = DockStyle.Fill,
             AutoSize = true,
             MaximumSize = new Size(420, 0)
@@ -535,7 +518,7 @@ public sealed partial class MainForm : Form
     {
         var group = new GroupBox
         {
-            Text = T("Downloaded ZIM Files"),
+            Text = "Downloaded ZIM Files",
             Dock = DockStyle.Fill
         };
 
@@ -551,7 +534,7 @@ public sealed partial class MainForm : Form
 
         layout.Controls.Add(new Label
         {
-            Text = T("Completed items are marked directly in this list. Select one row and start a conversion from the override panel above."),
+            Text = "Completed items are marked directly in this list. Select one row and start a conversion from the override panel above.",
             AutoSize = true,
             Dock = DockStyle.Top,
             MaximumSize = new Size(470, 0)
@@ -574,7 +557,7 @@ public sealed partial class MainForm : Form
 
     private TabPage BuildTasksTab()
     {
-        var tab = new TabPage(T("Tasks"));
+        var tab = new TabPage("Tasks");
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -595,7 +578,7 @@ public sealed partial class MainForm : Form
         buttonPanel.Controls.Add(_resumeTaskButton);
         buttonPanel.Controls.Add(new Label
         {
-            Text = T("Running tasks auto-save progress before exit and resume from article checkpoints."),
+            Text = "Running tasks auto-save progress before exit and resume from article checkpoints.",
             AutoSize = true,
             Margin = new Padding(16, 8, 3, 3)
         });
@@ -608,7 +591,7 @@ public sealed partial class MainForm : Form
 
     private TabPage BuildHistoryTab()
     {
-        var tab = new TabPage(T("History"));
+        var tab = new TabPage("History");
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -630,7 +613,7 @@ public sealed partial class MainForm : Form
         filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        filterPanel.Controls.Add(new Label { Text = T("Keyword"), Anchor = AnchorStyles.Left, AutoSize = true }, 0, 0);
+        filterPanel.Controls.Add(new Label { Text = "Keyword", Anchor = AnchorStyles.Left, AutoSize = true }, 0, 0);
         filterPanel.Controls.Add(_historySearchTextBox, 1, 0);
         filterPanel.Controls.Add(_refreshHistoryButton, 2, 0);
 
@@ -642,7 +625,7 @@ public sealed partial class MainForm : Form
 
     private TabPage BuildLogsTab()
     {
-        var tab = new TabPage(T("Logs"));
+        var tab = new TabPage("Logs");
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -666,11 +649,11 @@ public sealed partial class MainForm : Form
         filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        filterPanel.Controls.Add(new Label { Text = T("Search"), Anchor = AnchorStyles.Left, AutoSize = true }, 0, 0);
+        filterPanel.Controls.Add(new Label { Text = "Search", Anchor = AnchorStyles.Left, AutoSize = true }, 0, 0);
         filterPanel.Controls.Add(_logSearchTextBox, 1, 0);
         filterPanel.Controls.Add(_selectedTaskLogsOnlyCheckBox, 2, 0);
         filterPanel.Controls.Add(_refreshLogsButton, 3, 0);
-        filterPanel.Controls.Add(new Label { Text = T("Select a task row to filter logs by task ID."), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(12, 8, 0, 0) }, 4, 0);
+        filterPanel.Controls.Add(new Label { Text = "Select a task row to filter logs by task ID.", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(12, 8, 0, 0) }, 4, 0);
 
         layout.Controls.Add(filterPanel, 0, 0);
         layout.Controls.Add(_logsGrid, 0, 1);
@@ -701,7 +684,7 @@ public sealed partial class MainForm : Form
 
         try
         {
-            SetStatus(T("Initializing application state..."));
+            SetStatus("Initializing application state...");
             await _appService.InitializeAsync();
             FileTraceLogger.Info(nameof(MainForm), "InitializeAsync STEP", new { step = "AppService.InitializeAsync completed" });
             await LoadSettingsIntoFormAsync();
@@ -720,7 +703,7 @@ public sealed partial class MainForm : Form
             await ScanAndRefreshAsync(initialLoad: true);
             await TryLoadWeKnoraKnowledgeBasesAsync();
             _refreshTimer.Start();
-            SetStatus(T("Ready."));
+            SetStatus("Ready.");
             scope.Success(new
             {
                 ready = true,
@@ -731,7 +714,7 @@ public sealed partial class MainForm : Form
         {
             var startupLogPath = Path.Combine(AppPaths.ApplicationDataDirectory, "startup-error.log");
             File.WriteAllText(startupLogPath, exception.ToString());
-            SetStatus(TF("Initialization failed. See {0} for details.", startupLogPath));
+            SetStatus($"Initialization failed. See {startupLogPath} for details.");
             scope.Fail(exception, new
             {
                 startupErrorLog = FileTraceLogger.SummarizePath(startupLogPath)
@@ -749,7 +732,6 @@ public sealed partial class MainForm : Form
             _kiwixDirectoryTextBox.Text = settings.KiwixDesktopDirectory ?? string.Empty;
             _defaultOutputDirectoryTextBox.Text = settings.DefaultOutputDirectory ?? string.Empty;
             _zimdumpPathTextBox.Text = settings.ZimdumpExecutablePath ?? string.Empty;
-            _taskOutputOverrideTextBox.Text = settings.TaskOutputOverrideDirectory ?? string.Empty;
             _snapshotIntervalUpDown.Value = Math.Min(_snapshotIntervalUpDown.Maximum, Math.Max(_snapshotIntervalUpDown.Minimum, settings.SnapshotIntervalSeconds));
             _weKnoraBaseUrlTextBox.Text = settings.WeKnoraBaseUrl ?? string.Empty;
             _weKnoraAccessTokenTextBox.Text = settings.WeKnoraAccessToken ?? string.Empty;
@@ -765,13 +747,7 @@ public sealed partial class MainForm : Form
             _weKnoraAuthModeComboBox.SelectedItem = settings.WeKnoraAuthMode.ToString();
             _weKnoraAutoCreateKnowledgeBaseCheckBox.Checked = settings.WeKnoraAutoCreateKnowledgeBase;
             _weKnoraAppendMetadataCheckBox.Checked = settings.WeKnoraAppendMetadataBlock;
-            _historySearchTextBox.Text = settings.HistorySearchText ?? string.Empty;
-            _logSearchTextBox.Text = settings.LogSearchText ?? string.Empty;
-            _selectedTaskLogsOnlyCheckBox.Checked = settings.SelectedTaskLogsOnly;
-            _weKnoraSyncSearchTextBox.Text = settings.WeKnoraSyncSearchText ?? string.Empty;
-            _weKnoraSyncLogSearchTextBox.Text = settings.WeKnoraSyncLogSearchText ?? string.Empty;
-            _selectedWeKnoraSyncLogsOnlyCheckBox.Checked = settings.SelectedWeKnoraSyncLogsOnly;
-            ApplyStoredLayoutPreferences(settings);
+            ApplyShellSettings(settings);
 
             scope.Success(SummarizeAppSettings(settings));
         }
@@ -794,17 +770,17 @@ public sealed partial class MainForm : Form
 
         if (!Directory.Exists(_kiwixDirectoryTextBox.Text))
         {
-            missingDirectories.Add(T("the kiwix-desktop directory"));
+            missingDirectories.Add("the kiwix-desktop directory");
         }
 
         if (!Directory.Exists(_defaultOutputDirectoryTextBox.Text))
         {
-            missingDirectories.Add(T("the default output directory"));
+            missingDirectories.Add("the default output directory");
         }
 
         if (missingDirectories.Count > 0)
         {
-            SetStatus(TF("Configure {0} before scanning or converting.", string.Join(T(" and "), missingDirectories)));
+            SetStatus($"Configure {string.Join(" and ", missingDirectories)} before scanning or converting.");
             scope.Success(new
             {
                 configured = false,
@@ -822,14 +798,11 @@ public sealed partial class MainForm : Form
     {
         using var scope = FileTraceLogger.Enter(nameof(MainForm), nameof(SaveSettingsAsync), new { silent });
 
-        var persistedWindowSize = GetPersistedWindowSize();
-
         var settings = new AppSettings
         {
             KiwixDesktopDirectory = string.IsNullOrWhiteSpace(_kiwixDirectoryTextBox.Text) ? null : _kiwixDirectoryTextBox.Text.Trim(),
             DefaultOutputDirectory = string.IsNullOrWhiteSpace(_defaultOutputDirectoryTextBox.Text) ? null : _defaultOutputDirectoryTextBox.Text.Trim(),
             ZimdumpExecutablePath = string.IsNullOrWhiteSpace(_zimdumpPathTextBox.Text) ? null : _zimdumpPathTextBox.Text.Trim(),
-            TaskOutputOverrideDirectory = string.IsNullOrWhiteSpace(_taskOutputOverrideTextBox.Text) ? null : _taskOutputOverrideTextBox.Text.Trim(),
             SnapshotIntervalSeconds = (int)_snapshotIntervalUpDown.Value,
             WeKnoraBaseUrl = string.IsNullOrWhiteSpace(_weKnoraBaseUrlTextBox.Text) ? null : _weKnoraBaseUrlTextBox.Text.Trim(),
             WeKnoraAccessToken = string.IsNullOrWhiteSpace(_weKnoraAccessTokenTextBox.Text) ? null : _weKnoraAccessTokenTextBox.Text.Trim(),
@@ -844,25 +817,16 @@ public sealed partial class MainForm : Form
             WeKnoraEnableParentChild = _weKnoraEnableParentChildCheckBox.Checked,
             WeKnoraAuthMode = Enum.TryParse<WeKnoraAuthMode>(_weKnoraAuthModeComboBox.SelectedItem?.ToString(), out var authMode) ? authMode : WeKnoraAuthMode.ApiKey,
             WeKnoraAutoCreateKnowledgeBase = _weKnoraAutoCreateKnowledgeBaseCheckBox.Checked,
-            WeKnoraAppendMetadataBlock = _weKnoraAppendMetadataCheckBox.Checked,
-            HistorySearchText = string.IsNullOrWhiteSpace(_historySearchTextBox.Text) ? null : _historySearchTextBox.Text.Trim(),
-            LogSearchText = string.IsNullOrWhiteSpace(_logSearchTextBox.Text) ? null : _logSearchTextBox.Text.Trim(),
-            SelectedTaskLogsOnly = _selectedTaskLogsOnlyCheckBox.Checked,
-            WeKnoraSyncSearchText = string.IsNullOrWhiteSpace(_weKnoraSyncSearchTextBox.Text) ? null : _weKnoraSyncSearchTextBox.Text.Trim(),
-            WeKnoraSyncLogSearchText = string.IsNullOrWhiteSpace(_weKnoraSyncLogSearchTextBox.Text) ? null : _weKnoraSyncLogSearchTextBox.Text.Trim(),
-            SelectedWeKnoraSyncLogsOnly = _selectedWeKnoraSyncLogsOnlyCheckBox.Checked,
-            MainWindowWidth = Math.Max(MinimumSize.Width, persistedWindowSize.Width),
-            MainWindowHeight = Math.Max(MinimumSize.Height, persistedWindowSize.Height),
-            RootSplitterDistance = _rootSplitContainer.SplitterDistance > 0 ? _rootSplitContainer.SplitterDistance : DefaultRootSplitterDistance,
-            WeKnoraSyncUpperSplitterDistance = _weKnoraSyncUpperSplitContainer.SplitterDistance > 0 ? _weKnoraSyncUpperSplitContainer.SplitterDistance : DefaultWeKnoraSyncUpperSplitterDistance
+            WeKnoraAppendMetadataBlock = _weKnoraAppendMetadataCheckBox.Checked
         };
+        CaptureShellSettings(settings);
 
         try
         {
             await _appService.SaveSettingsAsync(settings);
             if (!silent)
             {
-                SetStatus(T("Settings saved."));
+                SetStatus("Settings saved.");
             }
 
             scope.Success(SummarizeAppSettings(settings));
@@ -880,11 +844,14 @@ public sealed partial class MainForm : Form
         {
             kiwixDirectory = FileTraceLogger.SummarizePath(_kiwixDirectoryTextBox.Text),
             defaultOutputDirectory = FileTraceLogger.SummarizePath(_defaultOutputDirectoryTextBox.Text),
+            mainWindowLeft = GetPersistedWindowBounds().Left,
+            mainWindowTop = GetPersistedWindowBounds().Top,
+            mainWindowWidth = GetPersistedWindowBounds().Width,
+            mainWindowHeight = GetPersistedWindowBounds().Height,
+            mainWindowState = GetPersistedWindowState().ToString(),
+            rootSplitterDistance = _rootSplitContainer.SplitterDistance,
+            weKnoraSyncUpperSplitterDistance = _weKnoraSyncUpperSplitContainer.SplitterDistance,
             zimdumpExecutablePath = FileTraceLogger.SummarizePath(_zimdumpPathTextBox.Text),
-            taskOutputOverride = FileTraceLogger.SummarizePath(_taskOutputOverrideTextBox.Text),
-            historySearchText = FileTraceLogger.SummarizeText(_historySearchTextBox.Text, 240),
-            logSearchText = FileTraceLogger.SummarizeText(_logSearchTextBox.Text, 240),
-            selectedTaskLogsOnly = _selectedTaskLogsOnlyCheckBox.Checked,
             snapshotIntervalSeconds = (int)_snapshotIntervalUpDown.Value,
             weKnoraBaseUrl = FileTraceLogger.SummarizeText(_weKnoraBaseUrlTextBox.Text, 240),
             weKnoraAccessToken = FileTraceLogger.RedactSecret(_weKnoraAccessTokenTextBox.Text),
@@ -899,14 +866,7 @@ public sealed partial class MainForm : Form
             weKnoraEnableParentChild = _weKnoraEnableParentChildCheckBox.Checked,
             weKnoraAuthMode = _weKnoraAuthModeComboBox.SelectedItem?.ToString(),
             weKnoraAutoCreateKnowledgeBase = _weKnoraAutoCreateKnowledgeBaseCheckBox.Checked,
-            weKnoraAppendMetadataBlock = _weKnoraAppendMetadataCheckBox.Checked,
-            weKnoraSyncSearchText = FileTraceLogger.SummarizeText(_weKnoraSyncSearchTextBox.Text, 240),
-            weKnoraSyncLogSearchText = FileTraceLogger.SummarizeText(_weKnoraSyncLogSearchTextBox.Text, 240),
-            selectedWeKnoraSyncLogsOnly = _selectedWeKnoraSyncLogsOnlyCheckBox.Checked,
-            mainWindowWidth = Width,
-            mainWindowHeight = Height,
-            rootSplitterDistance = _rootSplitContainer.SplitterDistance,
-            weKnoraSyncUpperSplitterDistance = _weKnoraSyncUpperSplitContainer.SplitterDistance
+            weKnoraAppendMetadataBlock = _weKnoraAppendMetadataCheckBox.Checked
         };
     }
 
@@ -916,8 +876,14 @@ public sealed partial class MainForm : Form
         {
             kiwixDirectory = FileTraceLogger.SummarizePath(settings.KiwixDesktopDirectory),
             defaultOutputDirectory = FileTraceLogger.SummarizePath(settings.DefaultOutputDirectory),
+            mainWindowLeft = settings.MainWindowLeft,
+            mainWindowTop = settings.MainWindowTop,
+            mainWindowWidth = settings.MainWindowWidth,
+            mainWindowHeight = settings.MainWindowHeight,
+            mainWindowState = settings.MainWindowState,
+            rootSplitterDistance = settings.RootSplitterDistance,
+            weKnoraSyncUpperSplitterDistance = settings.WeKnoraSyncUpperSplitterDistance,
             zimdumpExecutablePath = FileTraceLogger.SummarizePath(settings.ZimdumpExecutablePath),
-            taskOutputOverride = FileTraceLogger.SummarizePath(settings.TaskOutputOverrideDirectory),
             snapshotIntervalSeconds = settings.SnapshotIntervalSeconds,
             weKnoraBaseUrl = FileTraceLogger.SummarizeText(settings.WeKnoraBaseUrl, 240),
             weKnoraAccessToken = FileTraceLogger.RedactSecret(settings.WeKnoraAccessToken),
@@ -932,44 +898,8 @@ public sealed partial class MainForm : Form
             weKnoraEnableParentChild = settings.WeKnoraEnableParentChild,
             weKnoraAuthMode = settings.WeKnoraAuthMode.ToString(),
             weKnoraAutoCreateKnowledgeBase = settings.WeKnoraAutoCreateKnowledgeBase,
-            weKnoraAppendMetadataBlock = settings.WeKnoraAppendMetadataBlock,
-            historySearchText = FileTraceLogger.SummarizeText(settings.HistorySearchText, 240),
-            logSearchText = FileTraceLogger.SummarizeText(settings.LogSearchText, 240),
-            settings.SelectedTaskLogsOnly,
-            weKnoraSyncSearchText = FileTraceLogger.SummarizeText(settings.WeKnoraSyncSearchText, 240),
-            weKnoraSyncLogSearchText = FileTraceLogger.SummarizeText(settings.WeKnoraSyncLogSearchText, 240),
-            settings.SelectedWeKnoraSyncLogsOnly,
-            settings.MainWindowWidth,
-            settings.MainWindowHeight,
-            settings.RootSplitterDistance,
-            settings.WeKnoraSyncUpperSplitterDistance
+            weKnoraAppendMetadataBlock = settings.WeKnoraAppendMetadataBlock
         };
-    }
-
-    private void ApplyStoredLayoutPreferences(AppSettings settings)
-    {
-        var windowWidth = Math.Max(MinimumSize.Width, settings.MainWindowWidth > 0 ? settings.MainWindowWidth : DefaultWindowWidth);
-        var windowHeight = Math.Max(MinimumSize.Height, settings.MainWindowHeight > 0 ? settings.MainWindowHeight : DefaultWindowHeight);
-
-        if (Width != windowWidth || Height != windowHeight)
-        {
-            Size = new Size(windowWidth, windowHeight);
-        }
-
-        _preferredRootSplitterDistance = settings.RootSplitterDistance > 0
-            ? settings.RootSplitterDistance
-            : DefaultRootSplitterDistance;
-
-        EnsureRootSplitterDistance();
-        ApplyWeKnoraSyncUpperSplitterDistance(settings.WeKnoraSyncUpperSplitterDistance);
-    }
-
-    private Size GetPersistedWindowSize()
-    {
-        var bounds = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
-        var width = bounds.Width > 0 ? bounds.Width : Width;
-        var height = bounds.Height > 0 ? bounds.Height : Height;
-        return new Size(width, height);
     }
 
     private static object SummarizeToolAvailability(ToolAvailabilityResult availability)
@@ -1155,15 +1085,15 @@ public sealed partial class MainForm : Form
         var downloadId = GetSelectedDownloadId();
         if (downloadId is null)
         {
-            MessageBox.Show(this, T("Select a downloaded ZIM file first."), T("No Selection"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Select a downloaded ZIM file first.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
-        SetStatus(T("Starting conversion task..."));
+        SetStatus("Starting conversion task...");
         await SaveSettingsAsync(silent: true);
         await _appService.StartOrResumeTaskAsync(downloadId.Value, string.IsNullOrWhiteSpace(_taskOutputOverrideTextBox.Text) ? null : _taskOutputOverrideTextBox.Text.Trim());
         await RefreshAllViewsAsync();
-        SetStatus(T("Conversion task started or resumed."));
+        SetStatus("Conversion task started or resumed.");
     }
 
     private async Task PauseSelectedTaskAsync()
@@ -1171,14 +1101,14 @@ public sealed partial class MainForm : Form
         var taskId = GetSelectedTaskId();
         if (taskId is null)
         {
-            MessageBox.Show(this, T("Select a task row first."), T("No Selection"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Select a task row first.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
-        SetStatus(T("Pausing selected task..."));
+        SetStatus("Pausing selected task...");
         await _appService.PauseTaskAsync(taskId.Value);
         await RefreshAllViewsAsync();
-        SetStatus(T("Task paused."));
+        SetStatus("Task paused.");
     }
 
     private async Task ResumeSelectedTaskAsync()
@@ -1186,14 +1116,14 @@ public sealed partial class MainForm : Form
         var taskId = GetSelectedTaskId();
         if (taskId is null)
         {
-            MessageBox.Show(this, T("Select a task row first."), T("No Selection"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Select a task row first.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
-        SetStatus(T("Resuming selected task..."));
+        SetStatus("Resuming selected task...");
         await _appService.ResumeTaskAsync(taskId.Value);
         await RefreshAllViewsAsync();
-        SetStatus(T("Task resumed."));
+        SetStatus("Task resumed.");
     }
 
     private async void OnMainFormClosingAsync(object? sender, FormClosingEventArgs e)
@@ -1212,7 +1142,7 @@ public sealed partial class MainForm : Form
 
         e.Cancel = true;
         _refreshTimer.Stop();
-        SetStatus(T("Saving running task state before exit..."));
+        SetStatus("Saving running task state before exit...");
 
         try
         {
@@ -1221,12 +1151,110 @@ public sealed partial class MainForm : Form
         }
         catch (Exception exception)
         {
-            MessageBox.Show(this, exception.Message, T("Pause Before Exit Failed"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, exception.Message, "Pause Before Exit Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
         _allowClose = true;
         Close();
         scope.Success(new { skipped = false, allowClose = _allowClose });
+    }
+
+    private void ApplyShellSettings(AppSettings settings)
+    {
+        if (TryGetPersistedWindowBounds(settings, out var bounds))
+        {
+            StartPosition = FormStartPosition.Manual;
+            DesktopBounds = bounds;
+        }
+
+        var persistedWindowState = ParsePersistedWindowState(settings.MainWindowState);
+        if (persistedWindowState != FormWindowState.Normal)
+        {
+            WindowState = persistedWindowState;
+        }
+
+        EnsureRootSplitterDistance(settings.RootSplitterDistance);
+        ApplyWeKnoraSyncUpperSplitterDistance(settings.WeKnoraSyncUpperSplitterDistance);
+    }
+
+    private void CaptureShellSettings(AppSettings settings)
+    {
+        var bounds = GetPersistedWindowBounds();
+        settings.MainWindowLeft = bounds.Left;
+        settings.MainWindowTop = bounds.Top;
+        settings.MainWindowWidth = bounds.Width;
+        settings.MainWindowHeight = bounds.Height;
+        settings.MainWindowState = GetPersistedWindowState().ToString();
+        settings.RootSplitterDistance = _rootSplitContainer.SplitterDistance;
+        settings.WeKnoraSyncUpperSplitterDistance = _weKnoraSyncUpperSplitContainer.SplitterDistance;
+    }
+
+    private Rectangle GetPersistedWindowBounds()
+    {
+        var bounds = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
+        return bounds.Width > 0 && bounds.Height > 0
+            ? bounds
+            : new Rectangle(Left, Top, Width, Height);
+    }
+
+    private static FormWindowState ParsePersistedWindowState(string? value)
+    {
+        if (Enum.TryParse<FormWindowState>(value, out var parsedState) && parsedState != FormWindowState.Minimized)
+        {
+            return parsedState;
+        }
+
+        return FormWindowState.Normal;
+    }
+
+    private bool TryGetPersistedWindowBounds(AppSettings settings, out Rectangle bounds)
+    {
+        bounds = Rectangle.Empty;
+        if (!settings.MainWindowLeft.HasValue || !settings.MainWindowTop.HasValue || !settings.MainWindowWidth.HasValue || !settings.MainWindowHeight.HasValue)
+        {
+            return false;
+        }
+
+        var width = Math.Max(MinimumSize.Width, settings.MainWindowWidth.Value);
+        var height = Math.Max(MinimumSize.Height, settings.MainWindowHeight.Value);
+        var candidateBounds = new Rectangle(settings.MainWindowLeft.Value, settings.MainWindowTop.Value, width, height);
+        if (!Screen.AllScreens.Any(screen => screen.WorkingArea.IntersectsWith(candidateBounds)))
+        {
+            return false;
+        }
+
+        bounds = candidateBounds;
+        return true;
+    }
+
+    private FormWindowState GetPersistedWindowState()
+    {
+        return WindowState == FormWindowState.Minimized
+            ? FormWindowState.Normal
+            : WindowState;
+    }
+
+    private void ApplyWeKnoraSyncUpperSplitterDistance(int? preferredDistance)
+    {
+        const int defaultSplitterDistance = 230;
+        const int panel1MinSize = 140;
+        const int panel2MinSize = 180;
+
+        _weKnoraSyncUpperSplitContainer.Panel1MinSize = panel1MinSize;
+        _weKnoraSyncUpperSplitContainer.Panel2MinSize = panel2MinSize;
+
+        var maxSplitterDistance = _weKnoraSyncUpperSplitContainer.Height - _weKnoraSyncUpperSplitContainer.Panel2MinSize;
+        if (maxSplitterDistance < _weKnoraSyncUpperSplitContainer.Panel1MinSize)
+        {
+            return;
+        }
+
+        var targetSplitterDistance = preferredDistance ?? defaultSplitterDistance;
+        var desiredSplitterDistance = Math.Max(_weKnoraSyncUpperSplitContainer.Panel1MinSize, Math.Min(targetSplitterDistance, maxSplitterDistance));
+        if (_weKnoraSyncUpperSplitContainer.SplitterDistance != desiredSplitterDistance)
+        {
+            _weKnoraSyncUpperSplitContainer.SplitterDistance = desiredSplitterDistance;
+        }
     }
 
     private long? GetSelectedDownloadId()

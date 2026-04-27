@@ -1,13 +1,5 @@
 # Kiwix Converter
 
-[![CI](https://github.com/qurikuduo/kiwix_converter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/qurikuduo/kiwix_converter/actions/workflows/ci.yml)
-[![Release Workflow](https://github.com/qurikuduo/kiwix_converter/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/qurikuduo/kiwix_converter/actions/workflows/release.yml)
-[![Latest Release](https://img.shields.io/github/v/release/qurikuduo/kiwix_converter?display_name=tag&sort=semver)](https://github.com/qurikuduo/kiwix_converter/releases/latest)
-[![License: MIT](https://img.shields.io/badge/License-MIT-F2C94C.svg)](LICENSE)
-[![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=.net)](https://dotnet.microsoft.com/download/dotnet/8.0)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20x64-0078D6?logo=windows11)](https://github.com/qurikuduo/kiwix_converter/releases/latest)
-[![UI Languages](https://img.shields.io/badge/UI%20Languages-English%20%7C%20%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87%20%7C%20%E6%97%A5%E6%9C%AC%E8%AA%9E%20%7C%20Espa%C3%B1ol%20%7C%20%D8%A7%D9%84%D8%B9%D8%B1%D8%A8%D9%8A%D8%A9-0A7C86)](#ediciones-de-idioma)
-
 Kiwix Converter es una aplicación de escritorio WinForms + SQLite para convertir archivos ZIM descargados con kiwix-desktop a Markdown por artículo y a artefactos JSON listos para RAG.
 
 ## Ediciones de idioma
@@ -32,19 +24,6 @@ Kiwix Converter es una aplicación de escritorio WinForms + SQLite para converti
 - .NET 8 Desktop Runtime para ejecutar la aplicación empaquetada
 - .NET 8 SDK si quieres compilar el proyecto desde el código fuente
 - `zimdump` disponible en `PATH` o configurado desde la interfaz
-
-## Archivos de ejecución de escritorio
-
-- La aplicación empaquetada ahora intenta guardar sus datos de ejecución junto al EXE para que la build sea portátil y fácil de inspeccionar.
-- La configuración de SQLite y el estado de tareas se guardan en `data/kiwix-converter.db`.
-- Los registros de arranque y de ejecución se escriben en `logs/kiwix-converter-YYYY-MM-DD.log`.
-- Si la carpeta publicada no permite escritura, la aplicación vuelve a `%LocalAppData%\KiwixConverter`.
-
-## Captura de pantalla
-
-La siguiente imagen se capturó desde la build publicada actual para Windows.
-
-![Ventana principal de Kiwix Converter](docs/images/app-main-window.png)
 
 ## Diseño de arquitectura
 
@@ -138,7 +117,3 @@ La interfaz de sincronización permite:
 
 - Las páginas multilingües de la wiki se guardan en [docs/wiki](docs/wiki).
 - Actualmente incluyen la página principal y el proceso de release en inglés, chino, japonés, español y árabe.
-
-## Licencia
-
-Este proyecto se distribuye bajo la licencia MIT. Consulte [LICENSE](LICENSE).

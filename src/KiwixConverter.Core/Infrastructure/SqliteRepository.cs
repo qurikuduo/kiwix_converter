@@ -179,11 +179,53 @@ CREATE TABLE IF NOT EXISTS weknora_sync_log_entries (
                 case "defaultOutputDirectory":
                     settings.DefaultOutputDirectory = value;
                     break;
+                case "mainWindowLeft":
+                    if (int.TryParse(value, out var mainWindowLeft))
+                    {
+                        settings.MainWindowLeft = mainWindowLeft;
+                    }
+
+                    break;
+                case "mainWindowTop":
+                    if (int.TryParse(value, out var mainWindowTop))
+                    {
+                        settings.MainWindowTop = mainWindowTop;
+                    }
+
+                    break;
+                case "mainWindowWidth":
+                    if (int.TryParse(value, out var mainWindowWidth))
+                    {
+                        settings.MainWindowWidth = mainWindowWidth;
+                    }
+
+                    break;
+                case "mainWindowHeight":
+                    if (int.TryParse(value, out var mainWindowHeight))
+                    {
+                        settings.MainWindowHeight = mainWindowHeight;
+                    }
+
+                    break;
+                case "mainWindowState":
+                    settings.MainWindowState = value;
+                    break;
+                case "rootSplitterDistance":
+                    if (int.TryParse(value, out var rootSplitterDistance))
+                    {
+                        settings.RootSplitterDistance = rootSplitterDistance;
+                    }
+
+                    break;
+                case "weKnoraSyncUpperSplitterDistance":
+                    if (int.TryParse(value, out var weKnoraSyncUpperSplitterDistance))
+                    {
+                        settings.WeKnoraSyncUpperSplitterDistance = weKnoraSyncUpperSplitterDistance;
+                    }
+
+                    break;
                 case "zimdumpExecutablePath":
                     settings.ZimdumpExecutablePath = value;
-                    break;
-                case "taskOutputOverrideDirectory":
-                    settings.TaskOutputOverrideDirectory = value;
                     break;
                 case "snapshotIntervalSeconds":
                     if (int.TryParse(value, out var snapshotSeconds))
@@ -270,68 +312,6 @@ CREATE TABLE IF NOT EXISTS weknora_sync_log_entries (
                     }
 
                     break;
-                case "historySearchText":
-                    settings.HistorySearchText = value;
-                    break;
-                case "logSearchText":
-                    settings.LogSearchText = value;
-                    break;
-                case "selectedTaskLogsOnly":
-                    if (bool.TryParse(value, out var selectedTaskLogsOnly))
-                    {
-                        settings.SelectedTaskLogsOnly = selectedTaskLogsOnly;
-                    }
-                    else if (int.TryParse(value, out var selectedTaskLogsOnlyInt))
-                    {
-                        settings.SelectedTaskLogsOnly = selectedTaskLogsOnlyInt != 0;
-                    }
-
-                    break;
-                case "weKnoraSyncSearchText":
-                    settings.WeKnoraSyncSearchText = value;
-                    break;
-                case "weKnoraSyncLogSearchText":
-                    settings.WeKnoraSyncLogSearchText = value;
-                    break;
-                case "selectedWeKnoraSyncLogsOnly":
-                    if (bool.TryParse(value, out var selectedWeKnoraSyncLogsOnly))
-                    {
-                        settings.SelectedWeKnoraSyncLogsOnly = selectedWeKnoraSyncLogsOnly;
-                    }
-                    else if (int.TryParse(value, out var selectedWeKnoraSyncLogsOnlyInt))
-                    {
-                        settings.SelectedWeKnoraSyncLogsOnly = selectedWeKnoraSyncLogsOnlyInt != 0;
-                    }
-
-                    break;
-                case "mainWindowWidth":
-                    if (int.TryParse(value, out var mainWindowWidth) && mainWindowWidth > 0)
-                    {
-                        settings.MainWindowWidth = mainWindowWidth;
-                    }
-
-                    break;
-                case "mainWindowHeight":
-                    if (int.TryParse(value, out var mainWindowHeight) && mainWindowHeight > 0)
-                    {
-                        settings.MainWindowHeight = mainWindowHeight;
-                    }
-
-                    break;
-                case "rootSplitterDistance":
-                    if (int.TryParse(value, out var rootSplitterDistance) && rootSplitterDistance > 0)
-                    {
-                        settings.RootSplitterDistance = rootSplitterDistance;
-                    }
-
-                    break;
-                case "weKnoraSyncUpperSplitterDistance":
-                    if (int.TryParse(value, out var weKnoraSyncUpperSplitterDistance) && weKnoraSyncUpperSplitterDistance > 0)
-                    {
-                        settings.WeKnoraSyncUpperSplitterDistance = weKnoraSyncUpperSplitterDistance;
-                    }
-
-                    break;
             }
         }
 
@@ -345,8 +325,14 @@ CREATE TABLE IF NOT EXISTS weknora_sync_log_entries (
 
         await UpsertSettingAsync(connection, transaction, "kiwixDesktopDirectory", settings.KiwixDesktopDirectory, cancellationToken);
         await UpsertSettingAsync(connection, transaction, "defaultOutputDirectory", settings.DefaultOutputDirectory, cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "mainWindowLeft", settings.MainWindowLeft?.ToString(CultureInfo.InvariantCulture), cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "mainWindowTop", settings.MainWindowTop?.ToString(CultureInfo.InvariantCulture), cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "mainWindowWidth", settings.MainWindowWidth?.ToString(CultureInfo.InvariantCulture), cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "mainWindowHeight", settings.MainWindowHeight?.ToString(CultureInfo.InvariantCulture), cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "mainWindowState", settings.MainWindowState, cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "rootSplitterDistance", settings.RootSplitterDistance?.ToString(CultureInfo.InvariantCulture), cancellationToken);
+        await UpsertSettingAsync(connection, transaction, "weKnoraSyncUpperSplitterDistance", settings.WeKnoraSyncUpperSplitterDistance?.ToString(CultureInfo.InvariantCulture), cancellationToken);
         await UpsertSettingAsync(connection, transaction, "zimdumpExecutablePath", settings.ZimdumpExecutablePath, cancellationToken);
-        await UpsertSettingAsync(connection, transaction, "taskOutputOverrideDirectory", settings.TaskOutputOverrideDirectory, cancellationToken);
         await UpsertSettingAsync(connection, transaction, "snapshotIntervalSeconds", settings.SnapshotIntervalSeconds.ToString(CultureInfo.InvariantCulture), cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraBaseUrl", settings.WeKnoraBaseUrl, cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraAccessToken", settings.WeKnoraAccessToken, cancellationToken);
@@ -362,16 +348,6 @@ CREATE TABLE IF NOT EXISTS weknora_sync_log_entries (
         await UpsertSettingAsync(connection, transaction, "weKnoraAuthMode", settings.WeKnoraAuthMode.ToString(), cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraAutoCreateKnowledgeBase", settings.WeKnoraAutoCreateKnowledgeBase.ToString(), cancellationToken);
         await UpsertSettingAsync(connection, transaction, "weKnoraAppendMetadataBlock", settings.WeKnoraAppendMetadataBlock.ToString(), cancellationToken);
-        await UpsertSettingAsync(connection, transaction, "historySearchText", settings.HistorySearchText, cancellationToken);
-        await UpsertSettingAsync(connection, transaction, "logSearchText", settings.LogSearchText, cancellationToken);
-        await UpsertSettingAsync(connection, transaction, "selectedTaskLogsOnly", settings.SelectedTaskLogsOnly.ToString(), cancellationToken);
-        await UpsertSettingAsync(connection, transaction, "weKnoraSyncSearchText", settings.WeKnoraSyncSearchText, cancellationToken);
-        await UpsertSettingAsync(connection, transaction, "weKnoraSyncLogSearchText", settings.WeKnoraSyncLogSearchText, cancellationToken);
-        await UpsertSettingAsync(connection, transaction, "selectedWeKnoraSyncLogsOnly", settings.SelectedWeKnoraSyncLogsOnly.ToString(), cancellationToken);
-        await UpsertSettingAsync(connection, transaction, "mainWindowWidth", settings.MainWindowWidth.ToString(CultureInfo.InvariantCulture), cancellationToken);
-        await UpsertSettingAsync(connection, transaction, "mainWindowHeight", settings.MainWindowHeight.ToString(CultureInfo.InvariantCulture), cancellationToken);
-        await UpsertSettingAsync(connection, transaction, "rootSplitterDistance", settings.RootSplitterDistance.ToString(CultureInfo.InvariantCulture), cancellationToken);
-        await UpsertSettingAsync(connection, transaction, "weKnoraSyncUpperSplitterDistance", settings.WeKnoraSyncUpperSplitterDistance.ToString(CultureInfo.InvariantCulture), cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
     }
